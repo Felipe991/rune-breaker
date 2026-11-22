@@ -60,7 +60,7 @@ window.ES = {
   'STONE WARDEN': 'GUARDIÁN DE PIEDRA', 'STONE WARDEN  {n}': 'GUARDIÁN DE PIEDRA  {n}', 'WARDEN BROKEN': 'GUARDIÁN ROTO', 'NO TIMER': 'SIN TIEMPO', 'LUCKY PIECES': 'PIEZAS AFORTUNADAS',
   'GOLD RUSH {n}': 'FIEBRE DORADA {n}', 'STATIC {n}': 'ESTÁTICA {n}', 'BLACKOUT {n}': 'APAGÓN {n}', 'x{n} score {n}': 'x{n} puntos {n}', 'streak x{n}': 'racha x{n}',
   // ---- banners and floating text ----
-  'ROUND {n}': 'RONDA {n}', 'drop pieces so {n} runes of a colour touch': 'suelta piezas para juntar {n} runas de un color',
+  'ROUND {n}': 'RONDA {n}', 'match {n} runes of the same element': 'junta {n} runas del mismo elemento',
   'THE WARDEN ENDURES': 'EL GUARDIÁN RESISTE', '{n} stones fall as it retaliates': 'caen {n} piedras como represalia', '{n} stone falls as it retaliates': 'cae {n} piedra como represalia', 'TIDE {n}s': 'MAREA {n}s',
   'THE TIDE QUICKENS': 'LA MAREA SE ACELERA', 'you are nearing your best score': 'te acercas a tu récord', 'your score is climbing': 'tu puntuación sube', 'THE TIDE RUNS HOT': 'LA MAREA SE DESATA', 'beyond your best score': 'más allá de tu récord', 'from here it is harder': 'desde aquí es más difícil', 'WARDEN BROKEN!': '¡GUARDIÁN ROTO!',
   '+{n} bonus, {n} coins, ': '+{n} bonus, {n} monedas, ', 'MOTH NET CATCHES IT': 'LA RED LA ATRAPA', 'a free defence': 'una defensa gratis', 'PHOENIX!': '¡FÉNIX!', 'the top rows burn away': 'las filas de arriba arden',
@@ -277,4 +277,14 @@ window.ES = {
   'Your coins are waiting. Upgrade, equip trinkets, stock up on supplies and complete missions. Open it from the menu.': 'Tus monedas te esperan. Mejora, equipa trinkets, abastécete y completa misiones. Ábrelo desde el menú.',
   'Hold a column to aim, lift to drop': 'Mantén una columna para apuntar, suelta para dejar caer',
   'Hold a column to see where the piece will land, slide to aim, lift your finger to drop. Pick a piece below; ROTATE turns it.': 'Mantén una columna para ver dónde caerá la pieza, desliza para apuntar y levanta el dedo para soltar. Elige abajo; GIRAR la da la vuelta.',
+  // ---- Settings and shared UI ----
+  'SETTINGS': 'AJUSTES', 'SOUND': 'SONIDO', 'MUSIC': 'MÚSICA', 'LANGUAGE': 'IDIOMA', 'SHOW HINTS': 'MOSTRAR AYUDAS', 'RESET HINTS': 'REINICIAR AYUDAS', 'RESET': 'REINICIAR',
+  'Tap to close': 'Toca para cerrar', 'Esc: back': 'Esc: volver',
+  'DUST': 'POLVO', 'Dust drops from Warden chests. Upgrading a trinket costs coins and dust.': 'El polvo cae de los cofres de Guardián. Mejorar un trinket cuesta monedas y polvo.',
+  // ---- Game screen (touch) ----
+  'Drag a piece onto the board to drop it': 'Arrastra una pieza al tablero para soltarla', 'Tap a piece to rotate it': 'Toca una pieza para girarla', 'Match {n} runes of the same element': 'Junta {n} runas del mismo elemento',
+  'Drag a piece onto the board: the shadow shows where it lands, and lifting your finger drops it. Tap a piece to rotate it.': 'Arrastra una pieza al tablero: la sombra muestra dónde caerá y al levantar el dedo se suelta. Toca una pieza para girarla.',
+  'Make {n} or more runes of the same element touch and they blast. Bigger sets score more.': 'Junta {n} o más runas del mismo elemento y estallan. Los grupos más grandes puntúan más.',
+  'Tap the creature: swat ({n})': 'Toca la criatura: golpear ({n})', 'R{n}  {n}/{n}': 'R{n}  {n}/{n}', 'RELIC': 'RELIQUIA',
+  'SHOW BUTTONS': 'MOSTRAR BOTONES',
 };

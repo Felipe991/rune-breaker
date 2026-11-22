@@ -17,6 +17,7 @@ window.Music = (function () {
   const mf = m => 440 * Math.pow(2, (m - 69) / 12);
   const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }; // a steady "random" for patterns
   const tv = () => T().music_volume === undefined ? 0.55 : T().music_volume;
+  let prefMusic = true, prefSfx = true; const mg = () => (prefMusic ? tv() : 0), fg = () => (prefSfx ? tv() : 0); // the player can switch the music and the sound effects off separately
 
   // ---- instruments: each writes into a destination node `d` -------------------------------------------------
   function osc(d, type, f, t, dur, vol, a = 0.006, det = 0) {
@@ -178,11 +179,11 @@ window.Music = (function () {
   // ---- public ---------------------------------------------------------------------------------------------------
   M.attach = function (audio, getTune) {
     if (ac) return; ac = audio.ac; out = audio.out; T = getTune || T;
-    mix = ac.createGain(); mix.gain.value = tv(); duck = ac.createGain(); lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 16000; lp.Q.value = 0.5;
-    fx = ac.createGain(); fx.gain.value = tv(); an = ac.createAnalyser(); an.fftSize = 1024;
+    mix = ac.createGain(); mix.gain.value = mg(); duck = ac.createGain(); lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 16000; lp.Q.value = 0.5;
+    fx = ac.createGain(); fx.gain.value = fg(); an = ac.createAnalyser(); an.fftSize = 1024;
     lp.connect(duck).connect(mix); mix.connect(out); fx.connect(out); out.connect(an); // the meter listens after the master volume and mute
     const len = ac.sampleRate; noiseBuf = ac.createBuffer(1, len, ac.sampleRate); const ch = noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) ch[i] = hash(i * 0.37) * 2 - 1;
-    timer = setInterval(tick, 30); if (wanted) M.set(wanted); addEventListener('tune', () => { mix.gain.value = tv(); fx.gain.value = tv(); });
+    timer = setInterval(tick, 30); if (wanted) M.set(wanted); addEventListener('tune', () => { mix.gain.value = mg(); fx.gain.value = fg(); });
   };
   M.set = function (s) { // called every frame; acts only when something changed
     wanted = s; if (!ac) return; const key = JSON.stringify(s); if (key === last) return; const prevBed = last ? JSON.parse(last).bed : null; last = key; st = s;
@@ -243,6 +244,8 @@ window.Music = (function () {
     if (!an) return { rms: 0, peak: 0 }; const b = new Float32Array(an.fftSize); an.getFloatTimeDomainData(b); let sq = 0, pk = 0; for (const v of b) { sq += v * v; pk = Math.max(pk, Math.abs(v)); } return { rms: Math.sqrt(sq / b.length), peak: pk };
   };
   M.debug = function () { return { now: ac ? ac.currentTime : 0, t0: cur ? cur.t0 : 0, beat: cur ? cur.stepDur * 4 : 0, bed: cur && cur.name, next: nxt && nxt.name, notes, state: ac && ac.state, layers: cur ? Object.fromEntries(Object.entries(cur.lay).map(([k, v]) => [k, v.tgt])) : {}, filter: lp ? lp.frequency.value : 0 }; };
+  M.prefs = function (music, sfx) { prefMusic = music !== false; prefSfx = sfx !== false; if (mix) { mix.gain.value = mg(); fx.gain.value = fg(); } };
+  M.gains = () => ({ music: mix ? mix.gain.value : null, fx: fx ? fx.gain.value : null });
   M.suspend = () => { if (ac && ac.state === 'running') ac.suspend(); };
   M.resume = () => { if (ac && ac.state === 'suspended') ac.resume(); };
   return M;
