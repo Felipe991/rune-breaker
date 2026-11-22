@@ -95,6 +95,12 @@ window.CONFIG = {
   trinket_max_level: { value: 4, min: 1, max: 8, step: 1 },      // highest trinket level
   trinket_upgrade_cost: { value: 150, min: 10, max: 1000, step: 10 }, // coins per level to upgrade a trinket (cost = this x current level)
   dup_refund: { value: 50, min: 0, max: 500, step: 10 },         // coins for a duplicate of a max-level trinket
+  stage2_runs: { value: 3, min: 1, max: 30, step: 1 },              // Stage 2 (creatures): runs played ...
+  stage2_tier: { value: 2, min: 1, max: 4, step: 1 },               // ... and the combo tier reached in one run (2 = HOT)
+  stage3_runs: { value: 6, min: 1, max: 50, step: 1 },              // Stage 3 (Wardens): runs played ...
+  stage3_defended: { value: 3, min: 1, max: 50, step: 1 },          // ... and creatures defended against
+  stage4_runs: { value: 9, min: 1, max: 80, step: 1 },              // Stage 4 (surprises): runs played ...
+  stage4_wardens: { value: 1, min: 1, max: 30, step: 1 },           // ... and Wardens broken
   perk_cost: { value: 150, min: 10, max: 1000, step: 10 },        // coins per level for a perk (cost = this x next level)
   perk_meter_per_level: { value: 1, min: 0, max: 3, step: 1 },   // Deep Meter: runes off the Relic meter per level
   perk_time_per_level: { value: 0.5, min: 0, max: 2, step: 0.1 },// Steady Hands: seconds on every move bar per level

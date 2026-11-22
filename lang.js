@@ -52,7 +52,7 @@ window.ES = {
   'Enter: start   Esc: back   (add ?unlock=all to the address to test everything)': 'Enter: empezar   Esc: volver   (añade ?unlock=all a la dirección para probarlo todo)',
   'TIPS: ON': 'AYUDAS: SÍ', 'TIPS: OFF': 'AYUDAS: NO', 'RESET TIPS': 'REINICIAR AYUDAS',
   'Trinket slot {n}': 'Ranura de amuleto {n}', 'Bomb Sprite creature': 'Criatura Duende Bomba', 'Relic Joker creature': 'Criatura Bufón de Reliquias',
-  'Rare Relics (Prism, Ward, Chrono...)': 'Reliquias raras (Prisma, Custodia, Crono...)', 'Epic Relics (Blast, Rainbow, Cull)': 'Reliquias épicas (Explosión, Arcoíris, Poda)',
+  'Rare Relics (Prism, Chrono, Purify...)': 'Reliquias raras (Prisma, Crono, Purificar...)', 'Epic Relics (Blast, Rainbow, Cull)': 'Reliquias épicas (Explosión, Arcoíris, Poda)',
   'Legendary Relics (Supernova, Phoenix...)': 'Reliquias legendarias (Supernova, Fénix...)', 'Rare trinkets': 'Amuletos raros', 'Epic trinkets': 'Amuletos épicos', 'Legendary trinkets': 'Amuletos legendarios', 'Heat {n}': 'Calor {n}',
   // ---- the HUD ----
   'COMBO {n}  x{n}': 'COMBO {n}  x{n}', 'COMBO LOST  {n}': 'COMBO PERDIDO  {n}', 'CHAIN x{n}!': '¡CADENA x{n}!', 'FLOW {n}': 'FLUJO {n}', 'FAST': 'RÁPIDO', 'HOT': 'CALIENTE', 'BLAZING': 'ARDIENTE', 'FRENZY': 'FRENESÍ',
@@ -267,4 +267,14 @@ window.ES = {
   'Your combo can\'t break for {n} moves.': 'Tu combo no se rompe durante {n} jugadas.',
   'KINDLE +{n}': 'BRASAS +{n}', 'ECHO!': '¡ECO!', 'LONG FUSE HOLDS': 'LA MECHA AGUANTA', 'UNBROKEN': 'INQUEBRANTABLE',
   'ONE MORE PUSH?': '¿UN EMPUJÓN MÁS?', 'THE BOARD IS FULL': 'EL TABLERO ESTÁ LLENO', 'NOT YET!': '¡AÚN NO!', 'STILL IN IT?': '¿SIGUES EN ESTO?', 'ALMOST!': '¡CASI!',
+  // ---- Stages ----
+  'NEW': 'NUEVO', 'CREATURES': 'CRIATURAS', 'WARDENS': 'GUARDIANES', 'SURPRISES': 'SORPRESAS',
+  'NEW: CREATURES': 'NUEVO: CRIATURAS', 'NEW: WARDENS': 'NUEVO: GUARDIANES', 'NEW: SURPRISES': 'NUEVO: SORPRESAS',
+  'creatures join your runs': 'las criaturas se unen a tus partidas', 'a Warden guards every fifth round': 'un Guardián vigila cada quinta ronda', 'rules change for a few seconds': 'las reglas cambian unos segundos',
+  'Creatures visit your runs from round two. Beat each one before its ring empties, or it hurts your run.': 'Las criaturas visitan tus partidas desde la ronda dos. Véncelas antes de que se vacíe su anillo, o te harán daño.',
+  'A Warden attacks every fifth round. Score enough in the round to break it and win a chest. If it escapes, it returns wounded.': 'Un Guardián ataca cada quinta ronda. Suma suficientes puntos en la ronda para romperlo y ganar un cofre. Si escapa, vuelve herido.',
+  'Now and then a surprise changes the rules for a few seconds, good or bad. Watch the chip above the board.': 'De vez en cuando una sorpresa cambia las reglas unos segundos, para bien o para mal. Mira la etiqueta sobre el tablero.',
+  'Your coins are waiting. Upgrade, equip trinkets, stock up on supplies and complete missions. Open it from the menu.': 'Tus monedas te esperan. Mejora, equipa trinkets, abastécete y completa misiones. Ábrelo desde el menú.',
+  'Hold a column to aim, lift to drop': 'Mantén una columna para apuntar, suelta para dejar caer',
+  'Hold a column to see where the piece will land, slide to aim, lift your finger to drop. Pick a piece below; ROTATE turns it.': 'Mantén una columna para ver dónde caerá la pieza, desliza para apuntar y levanta el dedo para soltar. Elige abajo; GIRAR la da la vuelta.',
 };

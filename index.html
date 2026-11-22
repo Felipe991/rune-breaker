@@ -37,7 +37,7 @@ const TITLE = 'Rune Breaker';
 const TOUCH = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches); // a phone or tablet: no keyboard hints, bigger buttons and small text
 const BTN_H = TOUCH ? 76 : 50;
 let BUMP = false;
-const CONTROLS = TOUCH ? ['Tap a column to drop a piece', 'Tap a piece to choose it', 'ROTATE turns the piece', 'Beat the bar: each move has a timer'] : ['Left / Right: choose a column', '1 / 2: pick a piece', 'Up: rotate   Space: drop', 'Mouse or touch: tap a column to drop', 'Beat the bar: each move has a timer', 'P: pause   M: mute'];
+const CONTROLS = TOUCH ? ['Hold a column to aim, lift to drop', 'Tap a piece to choose it', 'ROTATE turns the piece', 'Beat the bar: each move has a timer'] : ['Left / Right: choose a column', '1 / 2: pick a piece', 'Up: rotate   Space: drop', 'Mouse or touch: tap a column to drop', 'Beat the bar: each move has a timer', 'P: pause   M: mute'];
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 };
 const CHEAP = params.get('render') === 'cheap';
 let seed;
@@ -189,7 +189,7 @@ const RELICS = [
   { id: 'hourglass', name: 'Hourglass', rar: 0, text: () => `+${tune.hourglass_time} s on every move bar. Stacks.` },
   { id: 'wildfire', name: 'Wildfire', rar: 1, text: () => `Next ${tune.wildfire_drops} drops: groups of ${Math.max(2, tune.detonate_size - 1)} detonate.` },
   { id: 'prism', name: 'Prism', rar: 1, gate: 'relic_a', text: () => 'Your next piece is one wild rune.' },
-  { id: 'ward', name: 'Ward', rar: 1, gate: 'relic_a', text: () => `${tune.ward_swats} swats on creatures. Peek at a Joker's curse.` },
+  { id: 'ward', name: 'Ward', rar: 1, gate: 'relic_a', stage: 2, text: () => `${tune.ward_swats} swats on creatures. Peek at a Joker's curse.` },
   { id: 'chrono', name: 'Chrono', rar: 1, gate: 'relic_a', text: () => `The move bar stops for your next ${tune.chrono_moves} moves.` },
   { id: 'purify', name: 'Purify', rar: 1, gate: 'relic_a', text: () => 'Break every stone on the board right now.' },
   { id: 'shield', name: 'Shield', rar: 1, gate: 'relic_a', text: () => 'Your next missed move keeps the combo. Stacks.' },
@@ -326,6 +326,7 @@ let cleanBest = best, bestRevived = false; // the best of runs that never revive
 try { const c = localStorage.getItem('rune-breaker-best-clean'); if (c !== null) cleanBest = Number(c) || 0; bestRevived = localStorage.getItem('rune-breaker-best-rev') === '1'; } catch (e) { /* keep */ }
 let meta = { recent: [], coins: 0, trinkets: { ember_charm: 1 }, equipped: ['ember_charm'], perks: {}, heat: 0, daily: { date: '', best: 0, plays: 0 }, streak: 0, lastDate: '', tips: {}, tipsOff: false, lang: '', gems: 0, free: { date: '', n: 0 }, muted: false, dust: [0, 0, 0, 0], unlocks: {}, life: {}, day: { date: '', s: {}, claimed: [false, false, false, false], counted: false }, week: { key: '', s: {}, claimed: [false, false, false, false, false], days: 0 }, sockets: 0, stars: {}, shards: 0, supplies: {}, bring: [], gift: { date: '' }, hints: {} }; // kept between runs
 try { const m = JSON.parse(localStorage.getItem('rune-breaker-meta')); if (m) meta = Object.assign(meta, m); } catch (e) { /* a new player */ }
+if (((meta.life || {}).wardens || 0) > 0) meta.workshopOpen = true; // anyone who has already broken a Warden has met the Workshop
 if (meta.muted) muted = true;
 if (/^[0-9,]+$/.test(params.get('recent') || '')) meta.recent = params.get('recent').split(',').filter(Boolean).map(Number); // ?recent=8000,8000,8000 pretends those are your last runs (for testing the adaptive help)
 if (params.get('best')) { best = Number(params.get('best')) || best; cleanBest = best; bestRevived = false; } // ?best=30000 pretends that is your best score (for testing)
@@ -367,7 +368,7 @@ const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], DIRS8 = DIRS4.concat([[1, 1], 
 const STAT_MAX = ['maxScore', 'maxCombo', 'maxChain', 'maxTier', 'maxTime', 'maxBossTier']; // these keep the best value; the others add up
 const TIER_NAMES = ['', 'WARM', 'HOT', 'BLAZING', 'FRENZY'], RARITY_NAMES = ['Common', 'Rare', 'Epic', 'Legendary'];
 const PROG = [ // progression missions: finishing one opens its unlock
-  { key: 'relic_a', name: 'Rare Relics (Prism, Ward, Chrono...)', stat: 'runs', text: n => `Play ${n} runs` },
+  { key: 'relic_a', name: 'Rare Relics (Prism, Chrono, Purify...)', stat: 'runs', text: n => `Play ${n} runs` },
   { key: 'bomb', name: 'Bomb Sprite creature', stat: 'defended', text: n => `Defend against ${n} creatures` },
   { key: 't_rare', name: 'Rare trinkets', stat: 'wardens', text: n => `Break ${n} Wardens` },
   { key: 'boss_ember', name: 'Ember Tyrant boss', stat: 'wardens', text: n => `Break ${n} Wardens` },
@@ -408,7 +409,7 @@ function refreshPeriods() { // a new day or a new week clears its own counters
   if (meta.day.date !== t) meta.day = { date: t, s: {}, claimed: [false, false, false, false], counted: false };
   if (meta.week.key !== w) meta.week = { key: w, s: {}, claimed: [false, false, false, false, false], days: 0 };
 }
-function dailyMissions() { const seed = dateSeed(todayStr()); return DAILY_POOL.map((pool, k) => Object.assign({ tier: k }, pool[(seed * (7 + k * 4) + k * 13) % pool.length])); }
+function dailyMissions() { const seed = dateSeed(todayStr()); return DAILY_POOL.map((all, k) => { const pool = all.filter(m => (STAGE_STAT[m.stat] || 1) <= stageNow()); return Object.assign({ tier: k }, pool[(seed * (7 + k * 4) + k * 13) % pool.length]); }); } // only missions for things that exist at this stage
 const dayReward = k => ({ coins: [tune.daily_coins_easy, tune.daily_coins_med, tune.daily_coins_hard][k] });
 const dayBonusReward = () => ({ gems: tune.daily_all_gems, dust: [tune.daily_all_dust, 0, 0, 0] });
 const weekTrack = () => [
@@ -422,7 +423,7 @@ const weekMissions = () => [
 ];
 function grant(r) { if (r.coins) meta.coins += r.coins; if (r.gems) meta.gems += r.gems; (r.dust || []).forEach((n, i) => { if (n) meta.dust[i] += n; }); }
 function claimables() { // how many rewards are waiting: shown as a dot on the Workshop and a badge on its Missions tab
-  refreshPeriods(); let n = 0; const d = dailyMissions(), dd = meta.day.claimed;
+  if (!workshopOpen()) return 0; refreshPeriods(); let n = 0; const d = dailyMissions(), dd = meta.day.claimed;
   d.forEach((m, k) => { if (getStat('day', m.stat) >= m.t && !dd[k]) n++; });
   if (d.every(m => getStat('day', m.stat) >= m.t) && !dd[3]) n++;
   weekTrack().forEach((w, k) => { if (meta.week.days >= w.need && !meta.week.claimed[k]) n++; });
@@ -521,6 +522,29 @@ function useSupplies(s) { // the start of a run: each supply you brought is used
   return used;
 }
 const unlocked = key => params.get('unlock') === 'all' || !!meta.unlocks[key] || (params.get('bosses') === 'all' && key.startsWith('boss_')); // ?bosses=all lets every Warden appear, for testing // unlocks come from missions; ?unlock=all opens everything for testing
+// ---- Stages: the game opens up gradually. 1 base (combos, Relics, powers, the tide); 2 creatures; 3 Wardens (the Workshop opens with the first one); 4 surprises.
+// A stage opens by runs played AND a skill milestone, is worked out from the saved progress, and is fixed for the whole run (it can only change when a run ends). ?stage=N forces one, ?unlock=all opens everything.
+const STAGE_MAX = 4;
+const stageParam = () => { const v = parseInt(params.get('stage'), 10); return v >= 1 && v <= STAGE_MAX ? v : 0; };
+function stageCompute() {
+  if (params.get('unlock') === 'all') return STAGE_MAX; const p = stageParam(); if (p) return p;
+  const L = meta.life || {}, runs = L.runs || 0; let st = 1;
+  if (runs >= tune.stage2_runs && (L.maxTier || 0) >= tune.stage2_tier) st = 2;
+  if (st >= 2 && runs >= tune.stage3_runs && (L.defended || 0) >= tune.stage3_defended) st = 3;
+  if (st >= 3 && runs >= tune.stage4_runs && (L.wardens || 0) >= tune.stage4_wardens) st = 4;
+  return st;
+}
+let stageCache = 0;
+const stageNow = () => stageCache || (stageCache = stageCompute());
+const refreshStage = () => (stageCache = stageCompute());
+const workshopOpen = () => params.get('unlock') === 'all' || stageParam() >= 3 || !!meta.workshopOpen;
+const STAGE_STAT = { defended: 2, wardens: 3, maxBossTier: 3, surprises: 4 }; // a mission may only ask for what exists by its stage
+const STAGE_INFO = {
+  2: { name: 'CREATURES', banner: 'NEW: CREATURES', sub: 'creatures join your runs', blurb: 'Creatures visit your runs from round two. Beat each one before its ring empties, or it hurts your run.', col: '#36c5ff' },
+  3: { name: 'WARDENS', banner: 'NEW: WARDENS', sub: 'a Warden guards every fifth round', blurb: 'A Warden attacks every fifth round. Score enough in the round to break it and win a chest. If it escapes, it returns wounded.', col: '#ff6b7a' },
+  4: { name: 'SURPRISES', banner: 'NEW: SURPRISES', sub: 'rules change for a few seconds', blurb: 'Now and then a surprise changes the rules for a few seconds, good or bad. Watch the chip above the board.', col: '#ffd23f' },
+  workshop: { name: 'WORKSHOP', blurb: 'Your coins are waiting. Upgrade, equip trinkets, stock up on supplies and complete missions. Open it from the menu.', col: '#7dffb0' },
+};
 const slots = () => 1 + meta.sockets + (params.get('unlock') === 'all' ? 2 : 0); // trinket sockets are bought in the Vault
 const maxHeat = () => (unlocked('heat1') ? 1 : 0) + (unlocked('heat2') ? 1 : 0) + (unlocked('heat3') ? 1 : 0);
 const perk = id => meta.perks[id] || 0;
@@ -549,6 +573,7 @@ function collectCoins(n, at) {
 function buildResultCards(s) { // one card per thing earned, in this order; the rewards card is always last
   const cards = [];
   (s.lootCards || []).forEach(c => cards.push(Object.assign({ kind: 'trinket' }, c)));
+  (s.stageCards || []).forEach(n => cards.push({ kind: 'stage', stage: n }));
   (s.newUnlocks || []).forEach(n => { const m = PROG.find(x => x.name === n); cards.push({ kind: 'unlock', name: n, blurb: m ? m.blurb : '' }); });
   (s.dailyDone || []).forEach(t => cards.push({ kind: 'mission', text: t }));
   if (s.daily) cards.push({ kind: 'daily', name: s.daily.name, best: s.daily.best !== undefined ? s.daily.best : meta.daily.best, streak: s.daily.streak !== undefined ? s.daily.streak : meta.streak, bonus: s.daily.bonus !== undefined ? s.daily.bonus : (s.dailyBonus || 0) });
@@ -571,6 +596,7 @@ function bankRun(s) { // the run is over: coins and loot are kept
     meta.coins += tune.dup_refund; s.lootCards.push({ id, status: 'max', level: have, refund: tune.dup_refund }); return t.name + ' (max level, +' + tune.dup_refund + ' coins)';
   });
   const opened = recordRun(s); s.newUnlocks = params.get('unlock') === 'all' ? [] : opened;
+  { const from = stageNow(), to = refreshStage(); s.stageCards = []; for (let n = from + 1; n <= to; n++) s.stageCards.push(n); if (s.workshopOpened) s.stageCards.push('workshop'); if (!workshopOpen()) s.dailyDone = []; } // crossing a stage is presented on the end screen
   (s.dustGain || [0, 0, 0, 0]).forEach((n, i) => { meta.dust[i] += n; }); s.gems += s.chestGems || 0; meta.shards += s.shardGain || 0;
   meta.gems += s.gems; s.nextBoss = toBoss();
   s.cards = buildResultCards(s); s.cardI = 0; s.cardT = 0; s.showStats = false; // the end screen is a short carousel of what you earned
@@ -601,7 +627,9 @@ function langButtons(y) {
   LANG_BTNS.forEach(([l, label, x]) => { const on = LANG === l; rr(x, y, 150, 46, 12); ctx.fillStyle = on ? '#2a3a9a' : '#12163a'; ctx.fill(); ctx.lineWidth = on ? 3 : 2; ctx.strokeStyle = on ? '#ffd23f' : '#2d3566'; ctx.stroke(); SKIPT = true; text(label, x + 75, y + 24, 22, on ? '#ffffff' : '#7f8ab8'); SKIPT = false; });
 }
 function langClick(c, y) { if (!c) return false; for (const [l, , x] of LANG_BTNS) if (inRect(c, x, y, 150, 46)) { setLang(l); return true; } return false; }
-function startRun(daily) { restoreCfg(); if (daily) applyDaily(); reset(!!daily); const used = useSupplies(state); if (used.length) banner('SUPPLIES', used.join(', '), '#7dffb0'); scene = 'play'; Music.stinger('start'); } // supplies are used when a run really starts (reset() also runs once at page load)
+function startRun(daily) { restoreCfg(); refreshStage(); if (daily) applyDaily(); reset(!!daily); const used = useSupplies(state); if (used.length) banner('SUPPLIES', used.join(', '), '#7dffb0');
+  { const st = stageNow(); if (meta.stageSeen === undefined) meta.stageSeen = st; else if (st > meta.stageSeen) { meta.stageSeen = st; const si = STAGE_INFO[st]; if (si) banner(si.banner, si.sub, si.col); saveMeta(); } } // a new stage is announced at the start of the run it opens
+  scene = 'play'; Music.stinger('start'); } // supplies are used when a run really starts (reset() also runs once at page load)
 function btn(x, y, w, h, label, on, col, size = 22) {
   rr(x, y, w, h, 12); ctx.fillStyle = on ? '#18207a' : '#12163a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = on ? col : '#2d3566'; ctx.stroke();
   text(label, x + w / 2, y + h / 2 + 1, size, on ? '#ffffff' : '#5d678f', 'center', '700', w - 14);
@@ -749,7 +777,7 @@ const tipsOn = () => !meta.tipsOff && params.get('tips') !== 'off';
 const cellRect = (r, c) => ({ x: BX + c * CELL - 6, y: BY + (r - HID) * CELL - 6, w: CELL + 12, h: CELL + 12 });
 const critterRect = () => { const p = eventPos(); return p ? { x: p.x - 62, y: p.y - 62, w: 124, h: 124 } : null; };
 const TIPS = {
-  welcome: { title: 'Drop the runes', text: () => TOUCH ? 'Tap a column to drop the chosen piece. Pick a piece below; ROTATE turns it.' : 'Tap or use the arrows to choose a column, then Space to drop. Pick a piece below; Up turns it.', focus: () => ({ x: BX - 4, y: 1002, w: 584, h: 150 }) },
+  welcome: { title: 'Drop the runes', text: () => TOUCH ? 'Hold a column to see where the piece will land, slide to aim, lift your finger to drop. Pick a piece below; ROTATE turns it.' : 'Tap or use the arrows to choose a column, then Space to drop. Pick a piece below; Up turns it.', focus: () => ({ x: BX - 4, y: 1002, w: 584, h: 150 }) },
   match: { title: 'Blast a set', text: () => 'Make 4 or more runes of one colour touch and they blast. Bigger sets score more.', focus: () => ({ x: BX - 8, y: BY - 8, w: 592, h: 736 }) },
   combo: { title: 'Combo', text: () => 'Blast sets move after move to build a COMBO. A higher multiplier means bigger scores.', focus: () => ({ x: 150, y: 110, w: 420, h: 50 }) },
   chain: { title: 'Chain reaction', text: () => 'When runes fall and blast again, it is a chain. Each link multiplies the score: x2, x4, x6...', focus: () => ({ x: BX - 8, y: BY - 8, w: 592, h: 736 }) },
@@ -824,7 +852,8 @@ function tideGap() {
   return g * Math.max(tune.tide_time_floor, 1 - state.runT / 3000) * (fx('heavy_rain') ? 0.5 : 1); // a little pressure on slow play too; Heavy Rain doubles the pace
 }
 const tideStones = () => { const P = pressure(); return P >= tune.tide_stones_max_at ? 4 : P >= tune.tide_stones_over_at ? 3 : P >= tune.tide_stones_hot_at ? 2 : 1; };
-function toBoss() { // how far the next Warden is: its round and the drops left to reach it
+function toBoss() { // how far the next Warden is: its round and the drops left to reach it (null while Wardens do not exist yet)
+  if (stageNow() < 3) return null;
   const s = state, L = tune.round_len, B = tune.boss_every; let r = s.round + 1, drops = Math.max(0, s.roundLen - s.roundDrops);
   while (r % B !== 0) { drops += L; r++; }
   return { round: r, drops };
@@ -1042,7 +1071,7 @@ function reset(daily) {
     t: 0, score: 0, shown: 0, gained: '', grid, phase: 'input', phaseT: 0,
     queue: [], sel: 0, col: 3, rep: 0, lastPx: -1,
     chain: 0, bestChain: 0, tempMult: 1, thresh: 4, groups: null, forced: null, blastCell: null,
-    round: 1, roundDrops: 0, roundLen: tune.round_len, roundStartScore: 0, bossDmg: 0, dropDmg: 0, wounded: null, boss: null, bossesBeaten: 0, stonesPending: 0,
+    round: 1, roundDrops: 0, roundLen: tune.round_len, roundStartScore: 0, bossDmg: 0, dropDmg: 0, wounded: null, boss: null, bossesBeaten: 0, stonesPending: 0, tideWaiting: 0,
     meter: 0, meterMax: tune.meter_base, relicQueue: [], choices: null, owned: {},
     relics: { kindle: 0, overdrive: 0, longfuse: 0, echo: 0, unbroken: 0, sparks: 0, overcharge: 0, wildfire: 0, prism: false, blast: false, ward: 0, gilded: 0, hourglass: 0, shield: 0, rainbow: false, jackpot: 0, phoenix: 0, chrono: 0, timewarp: false },
     moveT: tune.move_time, moveMax: tune.move_time, ticked: 99, armed: false, timeouts: 0,
@@ -1319,7 +1348,7 @@ function endChain() {
 function afterChain() { // the rest of a move once the board has settled
   const s = state;
   if (s.strikePending) { s.strikePending = false; if (s.boss && !s.boss.done && bossStrike(s)) { s.phase = 'fall'; return; } }
-  if (s.stonesPending > 0) { s.stonesPending--; addStone(); s.phase = 'fall'; return; }
+  if (s.stonesPending > 0) { s.stonesPending--; if (s.tideWaiting > 0) s.tideWaiting--; addStone(); s.phase = 'fall'; return; }
   if (s.roundDrops >= s.roundLen) nextRound();
   while (s.meter >= s.meterMax) { s.meter -= s.meterMax; s.picks++; s.meterMax = meterNeed(s.picks); s.relicQueue.push(false); }
   if (s.relicQueue.length) return openRelic();
@@ -1389,9 +1418,10 @@ function nextRound() {
   }
   if (!s.boss) s.roundHist.push({ pts: s.score - s.roundStartScore, drops: Math.max(1, s.roundDrops) });
   s.round++; s.roundDrops = 0; s.roundStartScore = s.score; s.bossDmg = 0; s.dropDmg = 0; s.roundBoost = false; s.relics.timewarp = false;
-  if (s.round % tune.boss_every === 0) {
+  if (stageNow() >= 3 && s.round % tune.boss_every === 0) {
     const n = s.round / tune.boss_every;
     s.boss = makeBoss(n); s.roundLen = tune.boss_round_len;
+    if (!meta.workshopOpen) { meta.workshopOpen = true; s.workshopOpened = true; saveMeta(); } // the first Warden opens the Workshop
     s.bossIntroPending = true; queueTip('boss'); // the entrance plays once any Relic pick is done
   } else { s.boss = null; s.roundLen = tune.round_len; if (!s.banner || s.banner.t > 1) banner('ROUND ' + s.round, '', '#9db4ff'); }
 }
@@ -1399,10 +1429,10 @@ function rollRelics(boss) {
   const w = [boss || state.fortune ? 0 : tune.w_common, tune.w_rare, tune.w_epic, tune.w_legendary], out = []; // a Fortune Scroll takes the Common cards out of the first offer // a Fortune Scroll takes the Common cards out of the first offer
   for (let tries = 0; out.length < 3 && tries < 60; tries++) {
     let r = rng() * w.reduce((a, b) => a + b, 0), rar = 0; while (rar < 3 && r >= w[rar]) { r -= w[rar]; rar++; }
-    const pool = RELICS.filter(x => x.rar === rar && !out.includes(x) && (!x.gate || unlocked(x.gate))); if (!pool.length) continue;
+    const pool = RELICS.filter(x => x.rar === rar && !out.includes(x) && (!x.gate || unlocked(x.gate)) && (!x.stage || stageNow() >= x.stage)); if (!pool.length) continue;
     out.push(pool[Math.floor(rng() * pool.length)]);
   }
-  while (out.length < 3) out.push(RELICS.find(x => !out.includes(x) && (!x.gate || unlocked(x.gate))));
+  while (out.length < 3) out.push(RELICS.find(x => !out.includes(x) && (!x.gate || unlocked(x.gate)) && (!x.stage || stageNow() >= x.stage)));
   return out;
 }
 // ---- Warden chests: tier 0-3 (green, blue, purple, yellow); each step up is a chained chance ----------------------
@@ -1565,7 +1595,7 @@ function updateRebirth(real) {
 function abandonRun() { finishRun(true); scene = 'title'; } // end the run, bank what it earned, and go to the main menu
 function reviveNow(kind) {
   const s = state; if (kind === 'charge') s.reviveCharges--; else if (kind === 'ad') s.adRevives++; else { meta.gems -= reviveGemCost(); s.gemRevives++; saveMeta(); }
-  Music.stinger('revive'); reviveBoard(); s.breathT = 0; s.stonesPending = 0; s.nextTide = Math.max(s.nextTide, s.runT + tune.revive_breath_s * 0.5); if (!s.revives) s.scoreAtRevive = s.score; s.revives++; // a breather: less pressure, no stones waiting, a late next tide
+  Music.stinger('revive'); reviveBoard(); s.breathT = 0; s.stonesPending = 0; s.tideWaiting = 0; s.nextTide = Math.max(s.nextTide, s.runT + tune.revive_breath_s * 0.5); if (!s.revives) s.scoreAtRevive = s.score; s.revives++; // a breather: less pressure, no stones waiting, a late next tide
   s.chain = 0; s.moveResolved = true; if (s.phase !== 'rebirth') s.phase = 'fall'; banner('REVIVED!', tune.revive_clear > 0 ? 'every block shatters' : 'the top rows burn away', '#7dffb0'); sweep(200, 1000, 0.6, 'triangle', 0.35); fanfare(2); events.push({ type: 'revive', kind });
 }
 const giveUpRect = n => ({ x: 260, y: 600 + n * 90 + 20, w: 200, h: 56 });
@@ -1589,7 +1619,7 @@ function drawRevive() {
   const s = state; if (s.phase !== 'revive') return; const o = reviveOptions(s), info = s.reviveInfo || toBoss();
   ctx.fillStyle = 'rgba(4,6,20,0.9)'; ctx.fillRect(0, -VOFF, W, H);
   { const title = reviveTitle(s); text(title, W / 2, 310, title.length > 12 ? 50 : 64, '#ff6b7a', 'center', '900', 660); } text('Score ' + fmtN(s.score), W / 2, 385, 40, '#ffffff', 'center', '800');
-  text(s.boss && !s.boss.done ? 'Warden: ' + Math.max(0, Math.min(100, Math.round(100 * (s.boss.hp - bossDmgNow(s)) / s.boss.hp))) + '% health left' : 'Next Warden: round ' + info.round + ', ' + info.drops + ' drops away', W / 2, 445, 28, '#ff9d8d', 'center', '700');
+  text(s.boss && !s.boss.done ? 'Warden: ' + Math.max(0, Math.min(100, Math.round(100 * (s.boss.hp - bossDmgNow(s)) / s.boss.hp))) + '% health left' : info ? 'Next Warden: round ' + info.round + ', ' + info.drops + ' drops away' : '', W / 2, 445, 28, '#ff9d8d', 'center', '700');
   text(tune.revive_clear > 0 ? 'A revive shatters every block' : 'A revive burns away the top ' + tune.revive_rows + ' rows', W / 2, 490, 24, '#9db4ff', 'center', '600'); text('Gems ' + meta.gems, W / 2, 540, 24, '#8be9ff', 'center', '700');
   o.forEach((k, i) => { const y = 600 + i * 90; btn(110, y, 500, 76, k === 'charge' ? 'USE SECOND WIND  (' + s.reviveCharges + ' left)' : k === 'ad' ? (adFree() ? 'REVIVE FOR FREE' : 'WATCH AD TO REVIVE') : 'SPEND ' + reviveGemCost() + ' GEMS TO REVIVE', true, k === 'gems' ? '#8be9ff' : k === 'ad' ? '#ffd23f' : '#7dffb0', 26); text(String(i + 1), 134, y + 38, 22, '#6f7bc4');
     if (k === 'gems' && s.gemRevives + 1 < tune.gem_revives) text('A second revive costs ' + tune.revive_gems * (2 + s.gemRevives) + ' gems', 360, y + 62, 16, '#6f7bc4', 'center', '600', 460); }); // the next price is only announced if the cap allows another
@@ -1760,7 +1790,7 @@ function surpriseFx(sp) { // good ones chime up, bad ones sink; the rarer, the b
 }
 function maybeSurprise() { // true when it moved the game to another phase
   const s = state;
-  if (s.round < tune.surprise_start_round || s.nextSurpriseIn > 0 || s.event || s.effects.length || (s.boss && !s.boss.done)) return false; // one at a time, so each one is clear
+  if (stageNow() < 4 || s.round < tune.surprise_start_round || s.nextSurpriseIn > 0 || s.event || s.effects.length || (s.boss && !s.boss.done)) return false; // one at a time, so each one is clear
   const good = rng() < tune.surprise_good_bias + (tr('clover') ? tune.clover_bias + 0.05 * (tr('clover') - 1) : 0), w = [tune.w_common, tune.w_rare, tune.w_epic, tune.w_legendary];
   let r = rng() * w.reduce((a, b) => a + b, 0), rar = 0; while (rar < 3 && r >= w[rar]) { r -= w[rar]; rar++; }
   let pool = SURPRISES.filter(x => x.good === good && x.rar === rar); if (!pool.length) pool = SURPRISES.filter(x => x.good === good && x.rar < rar);
@@ -1802,7 +1832,7 @@ function drawChips() { // what is active right now: each surprise shows its name
 }
 function maybeSpawnEvent() { // true when it moved the game to another phase
   const s = state;
-  if (s.event || s.round < tune.event_start_round || s.nextEventIn > 0) return false;
+  if (s.event || stageNow() < 2 || s.round < tune.event_start_round || s.nextEventIn > 0) return false;
   if (s.boss && !s.boss.done && !tune.event_in_boss) return false;
   const runes = [], cols = [], open = [];
   s.grid.forEach(row => row.forEach(ce => { if (ce && !ce.stone && !ce.wild) runes.push(ce); }));
@@ -1988,12 +2018,12 @@ function updatePlay(dt) {
   if (s.hitFlash > 0) s.hitFlash = Math.max(0, s.hitFlash - realDt * 4); // the flash of the final blow fades
   if (s.zoom && !s.fin) { s.zoom.k = 1 + (s.zoom.k - 1) * Math.max(0, 1 - realDt * 7); if (s.zoom.k < 1.01) s.zoom = null; } // after the blow the board eases back out // the killing blow's slow motion: the clock is in real time, the game runs slower
   s.t += dt; s.phaseT += dt; if (s.breathT >= 0) s.breathT += dt; updateFx(dt); if (Math.floor(s.runT) !== s.liveT) { s.liveT = Math.floor(s.runT); liveMax(); }
-  if (s.phase !== 'relic' && s.phase !== 'chest' && s.phase !== 'joker' && s.phase !== 'jokerReveal' && s.phase !== 'bossIntro' && s.phase !== 'finisher' && s.phase !== 'deathHold' && s.phase !== 'rebirth') { s.runT += dt; tickEffects(dt); } // effects run on play time, not while a choice is open
+  if (s.phase !== 'relic' && s.phase !== 'chest' && s.phase !== 'joker' && s.phase !== 'jokerReveal' && s.phase !== 'bossIntro' && s.phase !== 'finisher' && s.phase !== 'deathHold' && s.phase !== 'rebirth' && s.totalDrops > 0) { s.runT += dt; tickEffects(dt); } // effects run on play time, not while a choice is open; the clock (and with it the tide) starts with the first piece
   { const P = pressure(); // a warning before the tide gets hard, never a surprise
     if (!s.warnNear && P >= tune.pressure_from && P < 1) { s.warnNear = true; banner('THE TIDE QUICKENS', timeP() > scoreP() ? 'the run is getting long' : best >= tune.pressure_floor ? 'you are nearing your best score' : 'your score is climbing', '#ff9d4d'); }
     if (!s.warnOver && P >= 1) { s.warnOver = true; s.warnNear = true; banner('THE TIDE RUNS HOT', bar() > 0 && s.score > bar() ? 'beyond your best score' : 'from here it is harder', '#ff6b7a'); } } // the run clock waits while you choose a Relic or face the Joker
   if (s.runT >= s.nextTide) { // the tide: a stone falls after your next move, on a shrinking clock
-    s.tides++; s.nextTide = s.runT + tideGap(); s.stonesPending += tideStones() + (tr('blood_pact') ? 1 : 0);
+    s.tides++; s.nextTide = s.runT + tideGap(); if (s.tideWaiting <= 0) { const n = tideStones() + (tr('blood_pact') ? 1 : 0); s.stonesPending += n; s.tideWaiting = n; } // the tide does not pile up: while one batch is still waiting for your next move, the next tide adds none
     floatText(W / 2, BY + 36, 'THE TIDE RISES', '#ff6b7a', 34); queueTip('tide'); tone(95, 0.35, 'sawtooth', 0.22);
   }
   if (s.phase !== 'input') s.armed = false;
@@ -2180,7 +2210,7 @@ function hud() {
   ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(552, 62, 11, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke();
   text(String(s.runCoins), 572, 62, 26, '#ffd23f', 'left');
   text('ROUND ' + s.round + '  ' + Math.min(s.roundDrops, s.roundLen) + '/' + s.roundLen, BX + 576, 106, 20, '#8b95c9', 'right');
-  text(s.boss && !s.boss.done ? 'WARDEN' : 'Warden in ' + toBoss().drops, BX, 124, 16, '#ff9d8d', 'left');
+  if (stageNow() >= 3) text(s.boss && !s.boss.done ? 'WARDEN' : 'Warden in ' + toBoss().drops, BX, 124, 16, '#ff9d8d', 'left');
   if (s.runT >= tune.tide_start - 15 || s.tides > 0) text('TIDE ' + Math.max(0, Math.ceil(s.nextTide - s.runT)) + 's', BX, 142, 16, pressure() >= tune.pressure_from ? '#ff9d4d' : '#6f9bd0', 'left'); // when the next stones fall
   if (s.comboCount > 0) { // the combo count (whole) and its multiplier (decimal); one counter: sets and chain links feed it; the chain's own x2, x4, x6 rises beside it
     const last = s.misses > 0 && s.misses >= tune.combo_grace, risk = s.misses > 0;
@@ -2357,7 +2387,7 @@ function drawResultStats(st) { // the tuning numbers, kept out of the way: shown
 function drawResultCard() {
   const c = state.cards[state.cardI], p = Math.min(1, state.cardT / 0.35), ease = 1 - Math.pow(1 - p, 3), ox = (1 - ease) * 90, X = 80 + ox, Y = 450, w = 560, h = 440, cx = X + w / 2;
   let col = '#ffd23f', label = '';
-  if (c.kind === 'trinket') col = RCOL[TRINKETS.find(t => t.id === c.id).rar]; else if (c.kind === 'mission') col = '#7dffb0'; else if (c.kind === 'daily') col = '#ffc93c'; else if (c.kind === 'unlock') col = '#c46bff';
+  if (c.kind === 'trinket') col = RCOL[TRINKETS.find(t => t.id === c.id).rar]; else if (c.kind === 'mission') col = '#7dffb0'; else if (c.kind === 'daily') col = '#ffc93c'; else if (c.kind === 'unlock') col = '#c46bff'; else if (c.kind === 'stage') col = STAGE_INFO[c.stage].col;
   ctx.save(); ctx.globalAlpha = ease; colorCard(X, Y, w, h, col, 4, 0.34);
   if (c.kind === 'trinket') { const t = TRINKETS.find(x => x.id === c.id); label = c.status === 'new' ? 'NEW TRINKET' : c.status === 'level' ? 'LEVEL UP' : 'MAX LEVEL';
     text(label, cx, Y + 50, 26, col, 'center', '800', 480); ctx.fillStyle = hexA(col, 0.25); ctx.beginPath(); ctx.arc(cx, Y + 160, 70, 0, 7); ctx.fill(); trinketIcon(t.id, cx, Y + 160, 52, col);
@@ -2365,6 +2395,12 @@ function drawResultCard() {
   else if (c.kind === 'unlock') { text('UNLOCKED', cx, Y + 50, 26, col, 'center', '800', 480); ctx.fillStyle = hexA(col, 0.25); ctx.beginPath(); ctx.arc(cx, Y + 160, 70, 0, 7); ctx.fill();
     ctx.fillStyle = col; rr(cx - 28, Y + 150, 56, 44, 8); ctx.fill(); ctx.lineWidth = 8; ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(cx + 12, Y + 148, 22, Math.PI, Math.PI * 1.85); ctx.stroke();
     text(c.name, cx, Y + 270, 34, '#ffffff', 'center', '800', 500); wrap(c.blurb, cx, Y + 330, 480, 30, 22, '#c8d0ff'); }
+  else if (c.kind === 'stage') { const si = STAGE_INFO[c.stage], t = clock.now(); text('NEW', cx, Y + 50, 26, col, 'center', '800', 480); ctx.fillStyle = hexA(col, 0.25); ctx.beginPath(); ctx.arc(cx, Y + 160, 78, 0, 7); ctx.fill();
+    if (c.stage === 2) { moth(cx - 38, Y + 168, 32, t); thiefFig(cx + 40, Y + 170, 30, t); }
+    else if (c.stage === 3) warden(cx, Y + 160, 56 + 2 * Math.sin(t * 6), 1, 'stone', 0);
+    else if (c.stage === 4) { ctx.save(); ctx.translate(cx, Y + 160); ctx.rotate(t * 0.8); ctx.fillStyle = col; ctx.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? 16 : 54, a = i * Math.PI / 4; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); ctx.fill(); ctx.restore(); }
+    else trinketIcon('ember_charm', cx, Y + 160, 56, col);
+    text(si.name, cx, Y + 270, 40, '#ffffff', 'center', '800', 500); wrap(si.blurb, cx, Y + 326, 480, 30, 21, '#c8d0ff'); }
   else if (c.kind === 'mission') { text('MISSION COMPLETE', cx, Y + 50, 26, col, 'center', '800', 480); ctx.fillStyle = hexA(col, 0.25); ctx.beginPath(); ctx.arc(cx, Y + 160, 70, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.moveTo(cx - 32, Y + 162); ctx.lineTo(cx - 8, Y + 190); ctx.lineTo(cx + 36, Y + 134); ctx.lineWidth = 12; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); ctx.lineCap = 'butt';
     wrap(c.text, cx, Y + 270, 480, 36, 28, '#ffffff'); text('Claim the reward in the Workshop', cx, Y + 380, 20, '#9db4ff', 'center', '600', 500); }
@@ -2400,7 +2436,7 @@ const scenes = {
     },
   },
   title: {
-    update() { if (langClick(click, 22)) return; if (pressed('KeyS') || (click && inRect(click, 390, 1160, 150, 64))) openShop('title'); else if (pressed('KeyW') || (click && inRect(click, 180, 1160, 190, 64))) scene = 'workshop'; else if (pressed('KeyD') || (click && inRect(click, 210, 1075, 300, 72))) startRun(true); else if (pressed('Enter') || pressed('Space') || click) startRun(); },
+    update() { if (langClick(click, 22)) return; if (pressed('KeyS') || (click && inRect(click, workshopOpen() ? 390 : 285, 1160, 150, 64))) openShop('title'); else if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, 180, 1160, 190, 64)))) scene = 'workshop'; else if (workshopOpen() && (pressed('KeyD') || (click && inRect(click, 210, 1075, 300, 72)))) startRun(true); else if (pressed('Enter') || pressed('Space') || click) startRun(); },
     draw() {
       bg(); langButtons(22); for (let k = 0; k < 5; k++) tile(60 + k * 124, 230 + 14 * Math.sin(clock.now() * 2 + k), 108, k);
       text('RUNE', W / 2, 440, 110, '#ffffff', 'center', '900'); text('BREAKER', W / 2, 540, 110, '#9db4ff', 'center', '900');
@@ -2409,9 +2445,9 @@ const scenes = {
       text('BEST ' + fmtN(best), W / 2, 995, 34, '#ffd23f');
       text(TOUCH ? 'Tap to start' : 'Press Enter or tap to start', W / 2, 1038, 34, '#ffffff');
       const dm = dailyMod(), played = meta.daily.date === todayStr();
-      rr(210, 1075, 300, 72, 12); ctx.fillStyle = '#3a2a08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#ffc93c'; ctx.stroke();
-      text(TOUCH ? 'DAILY RUN' : 'DAILY RUN  (D)', W / 2, 1097, 24, '#ffffff'); text(dm.name + (played ? '  best ' + meta.daily.best : '') + (meta.streak > 0 && meta.lastDate === todayStr() ? '  streak ' + meta.streak : ''), W / 2, 1127, 18, '#ffc93c', 'center', '600');
-      btn(180, 1160, 190, 64, TOUCH ? 'WORKSHOP' : 'WORKSHOP (W)', true, '#5b78ff', 20); { const n = claimables(); if (n > 0) { ctx.fillStyle = '#ff4d6a'; ctx.beginPath(); ctx.arc(362, 1168, 13, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); SKIPT = true; text(String(n), 362, 1168, 16, '#ffffff', 'center', '800'); SKIPT = false; } } btn(390, 1160, 150, 64, TOUCH ? 'SHOP' : 'SHOP (S)', true, '#ffd23f', 20); if (giftReady()) { ctx.fillStyle = '#ff4d6a'; ctx.beginPath(); ctx.arc(528, 1168, 13, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); SKIPT = true; text('!', 528, 1168, 18, '#ffffff', 'center', '800'); SKIPT = false; } text(meta.coins + ' coins', W / 2, 1250, 24, '#ffd23f');
+      if (workshopOpen()) { rr(210, 1075, 300, 72, 12); ctx.fillStyle = '#3a2a08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#ffc93c'; ctx.stroke();
+      text(TOUCH ? 'DAILY RUN' : 'DAILY RUN  (D)', W / 2, 1097, 24, '#ffffff'); text(dm.name + (played ? '  best ' + meta.daily.best : '') + (meta.streak > 0 && meta.lastDate === todayStr() ? '  streak ' + meta.streak : ''), W / 2, 1127, 18, '#ffc93c', 'center', '600'); }
+      if (workshopOpen()) { btn(180, 1160, 190, 64, TOUCH ? 'WORKSHOP' : 'WORKSHOP (W)', true, '#5b78ff', 20); { const n = claimables(); if (n > 0) { ctx.fillStyle = '#ff4d6a'; ctx.beginPath(); ctx.arc(362, 1168, 13, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); SKIPT = true; text(String(n), 362, 1168, 16, '#ffffff', 'center', '800'); SKIPT = false; } } } const sx = workshopOpen() ? 390 : 285; btn(sx, 1160, 150, 64, TOUCH ? 'SHOP' : 'SHOP (S)', true, '#ffd23f', 20); if (giftReady()) { ctx.fillStyle = '#ff4d6a'; ctx.beginPath(); ctx.arc(sx + 138, 1168, 13, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); SKIPT = true; text('!', sx + 138, 1168, 18, '#ffffff', 'center', '800'); SKIPT = false; } text(meta.coins + ' coins', W / 2, 1250, 24, '#ffd23f');
     },
   },
   play: { update: updatePlay, draw: drawPlay },
@@ -2483,9 +2519,9 @@ const scenes = {
         return;
       }
       if (!state.adClaimed && !state.reviveAdDeclined && (pressed('KeyA') || (click && inRect(click, 110, 948, 500, 60)))) return startAd('double', claimDouble, 'over'); // one ask per run end
-      if (click && inRect(click, 470, 1030, 190, 70)) { scene = 'title'; Music.sfx('back'); return; }
-      if (pressed('KeyW') || (click && inRect(click, 265, 1030, 190, 70))) scene = 'workshop';
-      else if (pressed('KeyR') || pressed('Enter') || pressed('Space') || (click && inRect(click, 60, 1030, 190, 70))) startRun();
+      if (click && inRect(click, workshopOpen() ? 470 : 420, 1030, 190, 70)) { scene = 'title'; Music.sfx('back'); return; }
+      if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, 265, 1030, 190, 70)))) scene = 'workshop';
+      else if (pressed('KeyR') || pressed('Enter') || pressed('Space') || (click && inRect(click, workshopOpen() ? 60 : 110, 1030, 190, 70))) startRun();
     },
     draw() {
       bg(); ensureCards(); const st = state.stats || {}, last = state.cardI >= state.cards.length - 1;
@@ -2499,7 +2535,8 @@ const scenes = {
       if (!last) { if (!state.showStats) btn(590, 912, 110, 40, 'SKIP', true, '#6f7bc4', 16); btn(160, 1030, 400, 70, 'NEXT', true, '#7dffb0', 30); }
       else {
         if (!state.adClaimed && !state.reviveAdDeclined) btn(110, 948, 500, 60, (adFree() ? 'DOUBLE COINS  (+' : 'WATCH AD: DOUBLE COINS  (+') + (st.coins || 0) + ')', true, '#ffd23f', 24);
-        btn(60, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(265, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(470, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22);
+        if (workshopOpen()) { btn(60, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(265, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(470, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
+        else { btn(110, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(420, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
         if (tune.ad_banner && !adFree()) { ctx.save(); ctx.setLineDash([10, 8]); ctx.lineWidth = 2; ctx.strokeStyle = '#3a4580'; rr(80, 1166, 560, 70, 10); ctx.stroke(); ctx.restore(); text('AD SPACE', W / 2, 1201, 22, '#4a5590', 'center', '700'); } // reserved for a banner ad
       }
     },
