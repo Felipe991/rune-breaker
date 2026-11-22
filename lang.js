@@ -249,7 +249,7 @@ window.ES = {
   // ---- adaptive pace help ----
   'Pace help': 'Ayuda de ritmo', 'More time before the tide heats up, and a boost to catch your best': 'Más tiempo antes de que la marea se caliente, y un refuerzo para alcanzar tu mejor puntaje',
   // ---- the revive offer, fairly (decision: design/monetization/decisions/revive-offer.md) ----
-  'REVIVED RUN': 'PARTIDA CON REVIVE', 'BEST {n} (revived)': 'MEJOR {n} (con revive)', 'NEW BEST! (revived)': '¡NUEVO RÉCORD! (con revive)', 'Warden: {n}% health left': 'Guardián: {n}% de vida',
+  'Warden: {n}% health left': 'Guardián: {n}% de vida',
   'SPEND {n} GEMS TO REVIVE': 'GASTAR {n} GEMAS PARA REVIVIR', 'A second revive costs {n} gems': 'Un segundo revive cuesta {n} gemas', 'If the board fills': 'Si el tablero se llena',
   'If the board fills up you can revive: every block shatters and the run goes on. Use a Second Wind, watch an ad, or spend gems. You can always give up.': 'Si el tablero se llena puedes revivir: todos los bloques estallan y la partida sigue. Usa un Segundo Aliento, mira un anuncio o gasta gemas. Siempre puedes rendirte.',
   'Score': 'Puntos',

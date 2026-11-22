@@ -102,9 +102,14 @@ addEventListener('keyup', e => down.delete(e.code));
 function toLogical(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height - VOFF }; }
 let ptrType = 'mouse'; // 'mouse', 'touch' or 'pen': a mouse hovers (the ghost follows it), a finger only taps
 canvas.addEventListener('pointermove', e => { ptrType = e.pointerType || 'mouse'; ptr = toLogical(e); if (wsDrag) { const dy = ptr.y - wsDrag.y; if (Math.abs(dy) > 10) wsDrag.moved = true; if (wsDrag.moved) { const ns = Math.max(0, Math.min(wsMax, wsDrag.s - dy)); if (Math.floor(ns / 90) !== Math.floor(wsScroll / 90)) Music.sfx('tick'); wsScroll = ns; } } });
-canvas.addEventListener('pointerdown', e => { ptrType = e.pointerType || 'mouse'; ptr = toLogical(e); startAudio(); if (scrollScene()) { wsDrag = { x: ptr.x, y: ptr.y, s: wsScroll, moved: false }; return; } click = { x: ptr.x, y: ptr.y }; });
-addEventListener('pointerup', () => { if (wsDrag) { if (!wsDrag.moved) click = { x: wsDrag.x, y: wsDrag.y }; wsDrag = null; } }); // a tap that did not drag is a click
-addEventListener('pointercancel', () => { wsDrag = null; });
+// Aiming with a finger: pressing on the board shows the ghost where the piece will land, sliding moves it, and lifting the finger drops it; lifting outside the board cancels
+let touchAim = false;
+const onBoard = p => inRect(p, BX, BY - 40, COLS * CELL, ROWS * CELL + 40);
+canvas.addEventListener('pointerdown', e => { ptrType = e.pointerType || 'mouse'; ptr = toLogical(e); startAudio(); if (scrollScene()) { wsDrag = { x: ptr.x, y: ptr.y, s: wsScroll, moved: false }; return; }
+  if (ptrType !== 'mouse' && scene === 'play' && state.phase === 'input' && onBoard(ptr)) { touchAim = true; return; } // a finger on the board only aims until it lifts
+  click = { x: ptr.x, y: ptr.y }; });
+addEventListener('pointerup', e => { if (touchAim) { touchAim = false; ptr = toLogical(e); if (scene === 'play' && onBoard(ptr)) click = { x: ptr.x, y: ptr.y }; } if (wsDrag) { if (!wsDrag.moved) click = { x: wsDrag.x, y: wsDrag.y }; wsDrag = null; } }); // a tap that did not drag is a click
+addEventListener('pointercancel', () => { wsDrag = null; touchAim = false; });
 canvas.addEventListener('wheel', e => { if (scrollScene()) { wsScroll = Math.max(0, Math.min(wsMax, wsScroll + e.deltaY)); e.preventDefault(); } }, { passive: false });
 addEventListener('blur', () => down.clear());
 document.addEventListener('visibilitychange', () => { if (document.hidden && scene === 'play' && state.phase !== 'revive') openPause(); if (document.hidden) Music.suspend(); else Music.resume(); }); // switching apps pauses the run
@@ -2170,7 +2175,7 @@ function timerBar() { // the thin move-timer bar across the top
 function hud() {
   const s = state;
   text(fmtN(s.shown), W / 2, 56, 68, '#ffffff', 'center', '800');
-  text('BEST ' + fmtN(Math.max(best, s.score)) + ((s.score > best ? s.revives > 0 : bestRevived) ? ' (revived)' : ''), BX, 106, 20, '#8b95c9', 'left');
+  text('BEST ' + fmtN(Math.max(best, s.score)), BX, 106, 20, '#8b95c9', 'left');
   text('TIME ' + fmtTime(s.runT), BX, 62, 26, '#8b95c9', 'left');
   ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(552, 62, 11, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke();
   text(String(s.runCoins), 572, 62, 26, '#ffd23f', 'left');
@@ -2401,7 +2406,7 @@ const scenes = {
       text('RUNE', W / 2, 440, 110, '#ffffff', 'center', '900'); text('BREAKER', W / 2, 540, 110, '#9db4ff', 'center', '900');
       text('chain the runes, chase the score', W / 2, 620, 28, '#8b95c9', 'center', '600');
       CONTROLS.forEach((c, i) => text(c, W / 2, 722 + i * 42, 26, '#c8d0ff', 'center', '600'));
-      text('BEST ' + fmtN(best) + (bestRevived ? ' (revived)' : ''), W / 2, 995, 34, '#ffd23f');
+      text('BEST ' + fmtN(best), W / 2, 995, 34, '#ffd23f');
       text(TOUCH ? 'Tap to start' : 'Press Enter or tap to start', W / 2, 1038, 34, '#ffffff');
       const dm = dailyMod(), played = meta.daily.date === todayStr();
       rr(210, 1075, 300, 72, 12); ctx.fillStyle = '#3a2a08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#ffc93c'; ctx.stroke();
@@ -2486,8 +2491,7 @@ const scenes = {
       bg(); ensureCards(); const st = state.stats || {}, last = state.cardI >= state.cards.length - 1;
       text('THE BOARD FILLED', W / 2, 140, 38, '#ff6b7a', 'center', '800', 600);
       text(fmtN(state.score), W / 2, 240, 104, '#ffffff', 'center', '900');
-      text((state.newBest ? 'NEW BEST!' : 'BEST ' + fmtN(best)) + ((state.newBest ? state.revives > 0 : bestRevived) ? ' (revived)' : ''), W / 2, 318, 34, '#ffd23f');
-      if (state.revives > 0) text('REVIVED RUN', W / 2, 184, 22, '#8be9ff', 'center', '800');
+      text((state.newBest ? 'NEW BEST!' : 'BEST ' + fmtN(best)), W / 2, 318, 34, '#ffd23f');
       text('Round ' + state.round + '   Time ' + fmtTime(st.time || 0), W / 2, 364, 24, '#c8d0ff', 'center', '600');
       const nb = state.nextBoss; if (nb) text('Next Warden: round ' + nb.round + ', ' + nb.drops + ' drops away', W / 2, 400, 20, '#ff9d8d', 'center', '700', 640);
       btn(590, 24, 110, 44, 'STATS', !!state.showStats, '#9db4ff', 16);
