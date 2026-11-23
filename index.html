@@ -104,15 +104,16 @@ function toLogical(e) { const r = canvas.getBoundingClientRect(); return { x: (e
 let ptrType = 'mouse'; // 'mouse', 'touch' or 'pen': a mouse hovers (the ghost follows it), a finger only taps
 canvas.addEventListener('pointermove', e => { ptrType = e.pointerType || 'mouse'; ptr = toLogical(e); dragMove(); if (wsDrag) { const dy = ptr.y - wsDrag.y; if (Math.abs(dy) > 10) wsDrag.moved = true; if (wsDrag.moved) { const ns = Math.max(0, Math.min(wsMax, wsDrag.s - dy)); if (Math.floor(ns / 90) !== Math.floor(wsScroll / 90)) Music.sfx('tick'); wsScroll = ns; } } });
 // Pieces are dragged from the tray onto the board: the ghost follows the finger, lifting over the board drops, lifting anywhere else sends the piece back. A touch that barely moves is a tap (it rotates the piece).
-let drag = null, dragEnd = null, snapBack = null, rotAnim = null;
+let drag = null, dragEnd = null, snapBack = null, rotAnim = null, boardTouch = null, boardEnd = null; // boardTouch: a finger on the board itself (tap the projection to drop, drag to move it)
 const DRAG_PX = 9, DRAG_LIFT = 72; // how far a finger must move to count as a drag, and how far above it the carried piece is drawn
 const inBoardZone = p => p.x >= BX - 8 && p.x <= BX + COLS * CELL + 8 && p.y >= BY - 90 && p.y <= BY + ROWS * CELL;
-function dragMove() { if (!drag) return; if (!drag.moved && Math.hypot(ptr.x - drag.sx, ptr.y - drag.sy) > DRAG_PX) drag.moved = true; if (drag.moved) { drag.x = ptr.x; drag.fy = ptr.y; drag.y = ptr.y - DRAG_LIFT; } }
+function dragMove() { if (boardTouch) { if (!boardTouch.moved && Math.hypot(ptr.x - boardTouch.sx, ptr.y - boardTouch.sy) > DRAG_PX) boardTouch.moved = true; boardTouch.x = ptr.x; } if (!drag) return; if (!drag.moved && Math.hypot(ptr.x - drag.sx, ptr.y - drag.sy) > DRAG_PX) drag.moved = true; if (drag.moved) { drag.x = ptr.x; drag.fy = ptr.y; drag.y = ptr.y - DRAG_LIFT; } }
 canvas.addEventListener('pointerdown', e => { ptrType = e.pointerType || 'mouse'; ptr = toLogical(e); startAudio(); if (scrollScene()) { wsDrag = { x: ptr.x, y: ptr.y, s: wsScroll, moved: false }; return; }
   if (scene === 'play' && state.phase === 'input') { const i = slotAt(ptr); if (i >= 0) { drag = { slot: i, sx: ptr.x, sy: ptr.y, x: ptr.x, y: ptr.y - DRAG_LIFT, fy: ptr.y, moved: false }; return; } } // pressing a piece starts a drag (or a tap)
+  if (ptrType !== 'mouse' && scene === 'play' && state.phase === 'input' && inRect(ptr, BX, BY, COLS * CELL, ROWS * CELL)) { const s = state, p = s.queue[s.sel]; boardTouch = { sx: ptr.x, sy: ptr.y, x: ptr.x, moved: false, col: s.col, onGhost: ptr.x >= BX + s.col * CELL && ptr.x <= BX + (s.col + p.w) * CELL }; } // a finger on the board: on the projection it is a tap to drop, a drag only moves it
   click = { x: ptr.x, y: ptr.y }; });
-addEventListener('pointerup', e => { if (drag) { const d = drag; drag = null; ptr = toLogical(e); dragEnd = { slot: d.slot, moved: d.moved, valid: inBoardZone(ptr), x: ptr.x, y: ptr.y - DRAG_LIFT }; } if (wsDrag) { if (!wsDrag.moved) click = { x: wsDrag.x, y: wsDrag.y }; wsDrag = null; } }); // a tap that did not drag is a click
-addEventListener('pointercancel', () => { wsDrag = null; drag = null; });
+addEventListener('pointerup', e => { if (boardTouch) { const b = boardTouch; boardTouch = null; ptr = toLogical(e); boardEnd = { drop: !b.moved && b.onGhost, moved: b.moved, col: b.col, x: ptr.x }; } if (drag) { const d = drag; drag = null; ptr = toLogical(e); dragEnd = { slot: d.slot, moved: d.moved, valid: inBoardZone(ptr), x: ptr.x, y: ptr.y - DRAG_LIFT }; } if (wsDrag) { if (!wsDrag.moved) click = { x: wsDrag.x, y: wsDrag.y }; wsDrag = null; } }); // a tap that did not drag is a click
+addEventListener('pointercancel', () => { wsDrag = null; drag = null; boardTouch = null; });
 canvas.addEventListener('wheel', e => { if (scrollScene()) { wsScroll = Math.max(0, Math.min(wsMax, wsScroll + e.deltaY)); e.preventDefault(); } }, { passive: false });
 addEventListener('blur', () => down.clear());
 document.addEventListener('visibilitychange', () => { if (document.hidden && scene === 'play' && state.phase !== 'revive') openPause(); if (document.hidden) Music.suspend(); else Music.resume(); }); // switching apps pauses the run
@@ -175,7 +176,7 @@ function fanfare(rar) { [0, 1, 2, 3].slice(0, 2 + rar).forEach((n, i) => tone(39
 // ---- Look ----------------------------------------------------------------------------------
 const COLS = 8, ROWS = 10, HID = 4, R = ROWS + HID;      // board: 8 wide, 10 visible rows, 4 hidden above
 const CELL = 82, BX = 32, BY = 214, OX = 72;
-const POW_Y = BY + ROWS * CELL + 10, POW_H = 72, TRAY_Y = POW_Y + POW_H + 10, TRAY_H = 104; // the powers sit in a row under the board, the pieces under them                       // cell size and board top-left on screen
+const POW_Y = BY + ROWS * CELL + 24, POW_H = 68, TRAY_Y = POW_Y + POW_H + 8, TRAY_H = 100; // the powers sit in a row under the board, the pieces under them                       // cell size and board top-left on screen
 const COLORS = ['#ff5a4d', '#3ddc84', '#36c5ff', '#ffd23f', '#b46bff'];
 const TINTS = ['#4a1a1c', '#12402a', '#103a52', '#4a3d10', '#3a1c52'];
 const NAMES = ['Ember', 'Leaf', 'Tide', 'Volt', 'Moon'];
@@ -858,7 +859,7 @@ function tideGap() {
   else g = lerp(tune.tide_gap_over, tune.tide_gap_floor, Math.min(1, P - 2)); // past twice your best it keeps tightening, slowly
   return g * Math.max(tune.tide_time_floor, 1 - state.runT / 3000) * (fx('heavy_rain') ? 0.5 : 1); // a little pressure on slow play too; Heavy Rain doubles the pace
 }
-const tideStones = () => { const P = pressure(); return P >= tune.tide_stones_max_at ? 4 : P >= tune.tide_stones_over_at ? 3 : P >= tune.tide_stones_hot_at ? 2 : 1; };
+const tideStones = () => { const P = pressure(); return P >= tune.tide_stones_max_at ? 4 : P >= tune.tide_stones_over_at ? 3 : P >= tune.tide_stones_hot_at ? 2 : 1; }; // a tide's stones do not fall all at once: at most tide_move_cap per move (see resolve)
 function toBoss() { // how far the next Warden is: its round and the drops left to reach it (null while Wardens do not exist yet)
   if (stageNow() < 3) return null;
   const s = state, L = tune.round_len, B = tune.boss_every; let r = s.round + 1, drops = Math.max(0, s.roundLen - s.roundDrops);
@@ -1093,7 +1094,7 @@ function reset(daily) {
     t: 0, score: 0, shown: 0, gained: '', grid, phase: 'input', phaseT: 0,
     queue: [], sel: 0, col: 3, rep: 0, lastPx: -1,
     chain: 0, bestChain: 0, tempMult: 1, thresh: 4, groups: null, forced: null, blastCell: null,
-    round: 1, roundDrops: 0, roundLen: tune.round_len, roundStartScore: 0, bossDmg: 0, dropDmg: 0, wounded: null, boss: null, bossesBeaten: 0, stonesPending: 0, tideWaiting: 0,
+    round: 1, roundDrops: 0, roundLen: tune.round_len, roundStartScore: 0, bossDmg: 0, dropDmg: 0, wounded: null, boss: null, bossesBeaten: 0, stonesPending: 0, tideWaiting: 0, tideMoved: 0,
     meter: 0, meterMax: tune.meter_base, relicQueue: [], choices: null, owned: {},
     relics: { kindle: 0, overdrive: 0, longfuse: 0, echo: 0, unbroken: 0, sparks: 0, overcharge: 0, wildfire: 0, prism: false, blast: false, ward: 0, gilded: 0, hourglass: 0, shield: 0, rainbow: false, jackpot: 0, phoenix: 0, chrono: 0, timewarp: false },
     moveT: tune.move_time, moveMax: tune.move_time, ticked: 99, armed: false, timeouts: 0,
@@ -1188,7 +1189,7 @@ function floatText(x, y, s, col, size) { state.floats.push({ x, y, s, col, size,
 
 // ---- The run: drop, fall, detect, flash, burst, end of chain ---------------------------------
 function drop() {
-  const s = state, p = s.queue[s.sel], land = landing(p, s.col);
+  const s = state, p = s.queue[s.sel], land = landing(p, s.col); s.tideMoved = 0;
   if (land.some(L => L.r < 0)) { s.phase = 'fall'; if (usePhoenix()) return; return gameOver(); }
   s.thresh = tune.detonate_size;
   if (s.relics.wildfire > 0) { s.thresh = Math.max(2, tune.detonate_size - 1); s.relics.wildfire--; }
@@ -1371,7 +1372,8 @@ function endChain() {
 function afterChain() { // the rest of a move once the board has settled
   const s = state;
   if (s.strikePending) { s.strikePending = false; if (s.boss && !s.boss.done && bossStrike(s)) { s.phase = 'fall'; return; } }
-  if (s.stonesPending > 0) { s.stonesPending--; if (s.tideWaiting > 0) s.tideWaiting--; addStone(); s.phase = 'fall'; return; }
+  if (s.stonesPending - s.tideWaiting > 0) { s.stonesPending--; addStone(); s.phase = 'fall'; return; } // stones from Wardens, Jokers and surprises fall at once
+  if (s.tideWaiting > 0 && s.tideMoved < tune.tide_move_cap) { s.tideMoved++; s.stonesPending--; s.tideWaiting--; addStone(); s.phase = 'fall'; return; } // the tide's stones fall one per move, so it never reads as a blow
   if (s.roundDrops >= s.roundLen) nextRound();
   while (s.meter >= s.meterMax) { s.meter -= s.meterMax; s.picks++; s.meterMax = meterNeed(s.picks); s.relicQueue.push(false); }
   if (s.relicQueue.length) return openRelic();
@@ -1982,6 +1984,8 @@ function rotateSlot(i) { const s = state; if (s.sel !== i) selectSlot(i); s.queu
 function updateInput(dt) {
   const s = state;
   if (drag && drag.moved) { if (s.sel !== drag.slot) selectSlot(drag.slot); aimAt(drag.x); } // dragging a piece selects it and the ghost follows the finger
+  if (boardTouch && boardTouch.moved) aimAt(boardTouch.x); // dragging on the board moves the projection
+  if (boardEnd) { const e = boardEnd; boardEnd = null; if (e.drop) { s.col = e.col; return drop(); } if (!e.moved) aimAt(e.x); }
   if (dragEnd) { const e = dragEnd; dragEnd = null; if (!e.moved) rotateSlot(e.slot); else if (e.valid) { if (s.sel !== e.slot) selectSlot(e.slot); aimAt(e.x); return drop(); } else snapBack = { slot: e.slot, x: e.x, y: e.y, t: 0 }; }
   if (pressed('Digit1') || pressed('Numpad1')) selectSlot(0);
   if (pressed('Digit2') || pressed('Numpad2')) selectSlot(1);
@@ -2032,7 +2036,7 @@ function updateFx(dt) {
 function updatePlay(dt) {
   if (state.handDemo && state.totalDrops >= 1) { state.handDemo = false; meta.handSeen = true; saveMeta(); } // the hand retires after the first piece is dropped
   if (rotAnim && (rotAnim.t += dt) > 0.18) rotAnim = null; if (snapBack && (snapBack.t += dt) > 0.2) snapBack = null;
-  if (state.phase !== 'input') { drag = null; dragEnd = null; } // a drag does not outlive the player's turn
+  if (state.phase !== 'input') { drag = null; dragEnd = null; boardTouch = null; boardEnd = null; } // a drag does not outlive the player's turn
   const s = state;
   if (s.phase === 'revive') { updateRevive(); return; } // the revive offer pauses everything
   if (pressed('KeyP') || pressed('Escape')) { openPause(); return; }
@@ -2674,8 +2678,8 @@ function drawHelp() {
   { const r = helpRect('watch'); btn(r.x, r.y, r.w, r.h, 'WATCH IT ON THE BOARD', true, '#7dffb0', 26); }
   if (KBD) { text('Left/Right column   1-2 piece   Up rotate   Space drop', W / 2, 930, 18, '#6f7bc4', 'center', '600', W - 40); text('P pause   M mute', W / 2, 960, 18, '#6f7bc4', 'center', '600'); }
 }
-function drawHand(x, y, k, a) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.globalAlpha = a; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = '#3a2a1a'; ctx.fillStyle = '#ffe2c2';
-  rr(-17, 4, 40, 46, 14); ctx.fill(); ctx.stroke(); rr(-8, -34, 16, 48, 8); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(-20, 20, 8, 14, -0.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore(); }
+function drawHand(x, y, k, a) { // the "finger" of the demo is just a circle
+  ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke(); ctx.restore(); }
 // the hand: from the first piece in the tray, over the board, and a release (one cycle is 2.8 s)
 const HAND_CYCLE = 2.8;
 function handPos(t) {

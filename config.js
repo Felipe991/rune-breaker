@@ -95,6 +95,7 @@ window.CONFIG = {
   trinket_max_level: { value: 4, min: 1, max: 8, step: 1 },      // highest trinket level
   trinket_upgrade_cost: { value: 150, min: 10, max: 1000, step: 10 }, // coins per level to upgrade a trinket (cost = this x current level)
   dup_refund: { value: 50, min: 0, max: 500, step: 10 },         // coins for a duplicate of a max-level trinket
+  tide_move_cap: { value: 2, min: 1, max: 4, step: 1 },             // most stones a tide may drop in one move (the rest wait for the next moves, so a tide never reads as a blow)
   stage2_runs: { value: 3, min: 1, max: 30, step: 1 },              // Stage 2 (creatures): runs played ...
   stage2_tier: { value: 2, min: 1, max: 4, step: 1 },               // ... and the combo tier reached in one run (2 = HOT)
   stage3_runs: { value: 6, min: 1, max: 50, step: 1 },              // Stage 3 (Wardens): runs played ...
