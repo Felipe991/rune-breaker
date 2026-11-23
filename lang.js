@@ -307,4 +307,7 @@ window.ES = {
   // ---- Main menu and How to play ----
   'PLAY': 'JUGAR', 'DAILY CHALLENGE': 'RETO DIARIO', 'DAILY CHALLENGE  (D)': 'RETO DIARIO  (D)', 'WORKSHOP (W)': 'TALLER (W)', 'SHOP (S)': 'TIENDA (S)', 'How to play': 'Cómo jugar', 'Best: {n}': 'Récord: {n}', 'HOW TO PLAY': 'CÓMO JUGAR', 'WATCH IT ON THE BOARD': 'VERLO EN EL TABLERO', 'OPEN': 'ABRIR',
   'Drag a piece onto the board': 'Arrastra una pieza al tablero', 'The shadow shows where it lands. Lift your finger to drop it.': 'La sombra muestra dónde caerá. Levanta el dedo para soltarla.', 'A quick tap turns it, so it fits where you want.': 'Un toque rápido la gira, para que encaje donde quieras.', 'Bigger sets blast and score more.': 'Los grupos más grandes estallan y puntúan más.', 'Enter: play': 'Enter: jugar',
+  // ---- Missions screen ----
+  'CLAIM ALL': 'RECLAMAR TODO', 'DAILY': 'DIARIAS', 'WEEKLY': 'SEMANALES', 'PROGRESS': 'PROGRESO', 'Unlocked ({n})': 'Desbloqueadas ({n})', 'new ones every Monday': 'nuevas cada lunes', 'new ones every day': 'nuevas cada día', '{n} rewards waiting': '{n} recompensas esperando',
+  'resets in {n} d {n} h': 'se reinicia en {n} d {n} h', 'resets in {n} h {n} m': 'se reinicia en {n} h {n} min', 'All rewards claimed': 'Todas las recompensas reclamadas', 'Each one opens something new for your runs.': 'Cada una abre algo nuevo para tus partidas.',
 };

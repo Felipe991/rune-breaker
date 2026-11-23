@@ -403,9 +403,9 @@ function untilReset(now) { // how long until today ends, and how many whole days
   const ms = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now, dow = (now.getDay() + 6) % 7;
   return { h: Math.floor(ms / 3600000), m: Math.floor(ms % 3600000 / 60000), days: 6 - dow };
 }
-function resetText(weekly) { // a countdown for the Missions headings (plain when the date is pinned for tests, so pictures stay the same)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(params.get('date') || '')) return '';
-  const u = untilReset(new Date()); return weekly && u.days >= 1 ? 'resets in ' + u.days + (u.days === 1 ? ' day' : ' days') : 'resets in ' + u.h + ' h ' + u.m + ' m';
+function resetText(weekly, now) { // a countdown for the Missions headings: the week shows days and hours, the day shows hours and minutes (plain when the date is pinned for tests, so pictures stay the same)
+  if (!now && /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') || '')) return '';
+  const u = untilReset(now || new Date()); return weekly && u.days >= 1 ? 'resets in ' + u.days + ' d ' + u.h + ' h' : 'resets in ' + u.h + ' h ' + u.m + ' m';
 }
 function weekStr() { const [y, m, d] = todayStr().split('-').map(Number), dow = (new Date(y, m - 1, d).getDay() + 6) % 7; return dateStr(new Date(y, m - 1, d - dow)); } // the Monday of this week
 function refreshPeriods() { // a new day or a new week clears its own counters
@@ -426,14 +426,18 @@ const weekMissions = () => [
   { idx: 4, stat: 'runs', need: tune.week_runs, text: n => `Play ${n} runs this week`, rw: { coins: tune.week_runs_coins, gems: tune.week_runs_gems } },
 ];
 function grant(r) { if (r.coins) meta.coins += r.coins; if (r.gems) meta.gems += r.gems; (r.dust || []).forEach((n, i) => { if (n) meta.dust[i] += n; }); }
-function claimables() { // how many rewards are waiting: shown as a dot on the Workshop and a badge on its Missions tab
-  if (!workshopOpen()) return 0; refreshPeriods(); let n = 0; const d = dailyMissions(), dd = meta.day.claimed;
-  d.forEach((m, k) => { if (getStat('day', m.stat) >= m.t && !dd[k]) n++; });
-  if (d.every(m => getStat('day', m.stat) >= m.t) && !dd[3]) n++;
-  weekTrack().forEach((w, k) => { if (meta.week.days >= w.need && !meta.week.claimed[k]) n++; });
-  weekMissions().forEach(w => { if (getStat('week', w.stat) >= w.need && !meta.week.claimed[w.idx]) n++; });
-  return n;
+function claimList() { // every reward that can be claimed right now: one entry each, with the reward and how to take it
+  refreshPeriods(); const out = [], dm = dailyMissions(), dd = meta.day.claimed;
+  dm.forEach((m, k) => { if (getStat('day', m.stat) >= m.t && !dd[k]) out.push({ key: 'claim:d' + k, rw: dayReward(k), act: () => { grant(dayReward(k)); dd[k] = true; } }); });
+  { const nd = dm.filter(m => getStat('day', m.stat) >= m.t).length; if (nd === dm.length && !dd[3]) out.push({ key: 'claim:dbonus', rw: dayBonusReward(), act: () => { grant(dayBonusReward()); dd[3] = true; } }); }
+  weekTrack().forEach((w, i) => { if (meta.week.days >= w.need && !meta.week.claimed[i]) out.push({ key: 'claim:w' + i, rw: w.rw, act: () => { grant(w.rw); meta.week.claimed[i] = true; } }); });
+  weekMissions().forEach(w => { if (getStat('week', w.stat) >= w.need && !meta.week.claimed[w.idx]) out.push({ key: 'claim:w' + w.idx, rw: w.rw, act: () => { grant(w.rw); meta.week.claimed[w.idx] = true; } }); });
+  return out;
 }
+const claimables = () => (workshopOpen() ? claimList().length : 0); // the badge on Missions: how many rewards are waiting
+let missionFly = [], missionsOpenSec = {}; // rewards flying to the counters; which "Completed" rows are open
+function flyRewards(rw, from) { const h = wsHeaderRects(); for (let i = 0; i < Math.min(6, rw.coins ? Math.ceil(rw.coins / 40) : 0); i++) missionFly.push({ x: from.x, y: from.y, tx: h.coins.x + 12, ty: 48, t: -i * 0.07, kind: 'coin' }); for (let i = 0; i < Math.min(4, rw.gems || 0); i++) missionFly.push({ x: from.x, y: from.y, tx: h.gems.x + 13, ty: 48, t: -i * 0.07, kind: 'gem' }); }
+function claimAll() { claimList().forEach(c => { c.act(); flyRewards(c.rw, { x: 360, y: 280 }); }); saveMeta(); fanfare(3); Music.sfx('cash'); toast('All rewards claimed'); }
 function checkMissions() { // open whatever the counters now allow, the moment they allow it
   refreshPeriods(); const s = state, opened = [];
   if (!meta.day.counted && dailyMissions().every(m => getStat('day', m.stat) >= m.t)) { meta.day.counted = true; meta.week.days++; } // all three dailies: the day counts toward the weekly track
@@ -874,20 +878,32 @@ function rewardRow(x, y, r, size = 20, align = 'left') { // coins, gems and dust
     else if (p[0] === 'gem') gemIcon(ic, y, size * 0.55); else dustIcon(ic, y, size * 0.55, DUST_COL[p[2]]);
     SKIPT = true; text(String(p[1]), cx + size + 6, y, size, p[0] === 'coin' ? '#ffd23f' : p[0] === 'gem' ? '#8be9ff' : DUST_COL[p[2]], 'left', '800'); SKIPT = false; cx += widths[i] + gap; });
 }
-function missionItems(add) { // the Missions tab: daily, weekly, then the progression ladder
-  refreshPeriods(); const dm = dailyMissions(), dd = meta.day.claimed, DC = ['#3ddc84', '#4aa3ff', '#c46bff'];
-  add({ k: 'head', h: 40, col: '#ffd23f', text: 'DAILY MISSIONS   ' + (resetText(false) || 'new ones every day') }, 8);
-  dm.forEach((m, k) => { const val = getStat('day', m.stat), done = val >= m.t, rw = dayReward(k);
-    add({ k: 'mission', h: 124, col: DC[k], title: m.text(m.t), val, need: m.t, rw, done, claimed: dd[k], btns: [mkBtn('claim:d' + k, 456, 30, 216, 64, dd[k] ? 'CLAIMED' : done ? 'CLAIM' : 'IN PROGRESS', done && !dd[k], '#7dffb0', 24, () => { grant(rw); dd[k] = true; saveMeta(); fanfare(2); Music.sfx('cash'); toast('Reward claimed'); })] }); });
-  { const nd = dm.filter(m => getStat('day', m.stat) >= m.t).length, rw = dayBonusReward(), done = nd === 3;
-    add({ k: 'mission', h: 124, col: '#ffd23f', title: 'All three done today', val: nd, need: 3, rw, done, claimed: dd[3], btns: [mkBtn('claim:dbonus', 456, 30, 216, 64, dd[3] ? 'CLAIMED' : done ? 'CLAIM' : 'IN PROGRESS', done && !dd[3], '#7dffb0', 24, () => { grant(rw); dd[3] = true; saveMeta(); fanfare(3); Music.sfx('cash'); toast('Reward claimed'); })] }); }
-  add({ k: 'head', h: 40, col: '#ff9d4d', text: 'WEEKLY MISSIONS   ' + (resetText(true) || 'new ones every Monday') }, 8);
-  { const tr2 = weekTrack(), days = meta.week.days;
-    add({ k: 'track', h: 236, days, steps: tr2, btns: tr2.map((w, i) => mkBtn('claim:w' + i, 48 + i * 220, 176, 192, 44, meta.week.claimed[i] ? 'CLAIMED' : days >= w.need ? 'CLAIM' : 'LOCKED', days >= w.need && !meta.week.claimed[i], '#7dffb0', 20, () => { grant(w.rw); meta.week.claimed[i] = true; saveMeta(); fanfare(3); Music.sfx('cash'); toast('Reward claimed'); })) }); }
-  weekMissions().forEach(w => { const val = getStat('week', w.stat), done = val >= w.need, cl = meta.week.claimed[w.idx];
-    add({ k: 'mission', h: 124, col: '#ff9d4d', title: w.text(w.need), val, need: w.need, rw: w.rw, done, claimed: cl, btns: [mkBtn('claim:w' + w.idx, 456, 30, 216, 64, cl ? 'CLAIMED' : done ? 'CLAIM' : 'IN PROGRESS', done && !cl, '#7dffb0', 24, () => { grant(w.rw); meta.week.claimed[w.idx] = true; saveMeta(); fanfare(3); Music.sfx('cash'); toast('Reward claimed'); })] }); });
-  add({ k: 'head', h: 40, col: '#c46bff', text: 'PROGRESSION   each one opens something new' }, 8);
-  PROG.forEach(m => { const need = progTarget(m), val = Math.min(need, getStat('life', m.stat)), done = !!meta.unlocks[m.key] || params.get('unlock') === 'all'; add({ k: 'prog', h: 104, m, val, need, done }); });
+function missionCard(key, title, val, need, rw, claimed, act) { // one mission: its button exists only while it can be claimed
+  const done = val >= need, card = { k: 'mission', h: 124, title, val, need, rw, done, claimed: !!claimed, btns: [] };
+  if (done && !claimed) card.btns = [sbtn(key, 456, 30, 216, 64, 'CLAIM', { claimable: true }, () => { act(); saveMeta(); fanfare(2); Music.sfx('cash'); toast('Reward claimed'); flyRewards(rw, click || { x: 560, y: 400 }); })];
+  return card;
+}
+function missionSection(add, items, sec) { // claimable first, then in progress; the claimed ones fold into one row
+  const ready = items.filter(c => c.done && !c.claimed), prog = items.filter(c => !c.done), got = items.filter(c => c.claimed);
+  ready.concat(prog).forEach(c => add(c)); if (!got.length) return;
+  add({ k: 'completedrow', sec, label: 'Completed', n: got.length, open: !!missionsOpenSec[sec], h: 56 }); if (missionsOpenSec[sec]) got.forEach(c => add(c));
+}
+function missionItems(add) { // the Missions screen: reward claiming first, then daily, weekly and the progression
+  refreshPeriods(); const cl = claimList(), dm = dailyMissions(), dd = meta.day.claimed;
+  if (cl.length >= 2) add({ k: 'claimall', h: 112, n: cl.length, btns: [sbtn('claimall', 40, 38, 640, 64, 'CLAIM ALL', { claimable: true }, () => claimAll())] }, 12);
+  add({ k: 'head', h: 44, text: 'DAILY', right: resetText(false) || 'new ones every day' }, 8);
+  { const daily = dm.map((m, k) => missionCard('claim:d' + k, m.text(m.t), getStat('day', m.stat), m.t, dayReward(k), dd[k], () => { grant(dayReward(k)); dd[k] = true; }));
+    daily.push(missionCard('claim:dbonus', 'All three done today', dm.filter(m => getStat('day', m.stat) >= m.t).length, dm.length, dayBonusReward(), dd[3], () => { grant(dayBonusReward()); dd[3] = true; })); missionSection(add, daily, 'daily'); }
+  add({ k: 'head', h: 44, text: 'WEEKLY', right: resetText(true) || 'new ones every Monday' }, 8);
+  { const steps = weekTrack(), days = meta.week.days, xs = [0, 1, 2, 3, 4, 5, 6].map(i => 60 + i * 92), btns = [];
+    steps.forEach((w, i) => { const cx = xs[w.need - 1], got = meta.week.claimed[i], reach = days >= w.need; if (got) return;
+      btns.push(sbtn('claim:w' + i, cx - 70, 196, 140, 44, reach ? 'CLAIM' : 'LOCKED', reach ? { claimable: true } : { locked: 'Day ' + w.need }, () => { grant(w.rw); meta.week.claimed[i] = true; saveMeta(); fanfare(3); Music.sfx('cash'); toast('Reward claimed'); flyRewards(w.rw, click || { x: cx, y: 500 }); })); });
+    add({ k: 'track', h: 262, days, cur: days, circles: xs, steps, btns }); }
+  { const weekly = weekMissions().map(w => missionCard('claim:w' + w.idx, w.text(w.need), getStat('week', w.stat), w.need, w.rw, meta.week.claimed[w.idx], () => { grant(w.rw); meta.week.claimed[w.idx] = true; })); missionSection(add, weekly, 'weekly'); }
+  add({ k: 'head', h: 44, text: 'PROGRESS', info: { title: 'PROGRESS', text: 'Each one opens something new for your runs.' } }, 8);
+  { const rows = PROG.map(m => { const need = progTarget(m); return { m, need, val: Math.min(need, getStat('life', m.stat)), done: !!meta.unlocks[m.key] || params.get('unlock') === 'all' }; }), locked = rows.filter(r => !r.done), got = rows.filter(r => r.done);
+    locked.slice(0, 2).forEach(r => add(Object.assign({ k: 'prog', h: 104 }, r))); if (locked.length > 2) add({ k: 'morerow', n: locked.length - 2, h: 44 });
+    if (got.length) { add({ k: 'completedrow', sec: 'prog', label: 'Unlocked', n: got.length, open: !!missionsOpenSec.prog, h: 56 }); if (missionsOpenSec.prog) got.forEach(r => add(Object.assign({ k: 'prog', h: 104 }, r))); } }
 }
 function forgeCost(star, rar) { const k = 'forge' + star, sc = [1, 1, tune.dust_scale_epic, tune.dust_scale_legend][rar]; return { shards: tune[k + '_shards'], dust: Math.max(1, Math.round(tune[k + '_dust'] * sc)), coins: tune[k + '_coins'] }; }
 function starIcon(x, y, r, fill, col) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } ctx.closePath(); if (fill) { ctx.fillStyle = col; ctx.fill(); } ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke(); }
@@ -911,7 +927,7 @@ function drawWsHeader(title) {
   ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(h.coins.x + 12, 48, 12, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke(); SKIPT = true; text(fmtN(meta.coins), h.coins.x + 32, 48, 26, '#ffd23f', 'left', '800'); text(fmtN(meta.gems), h.gems.x + 32, 48, 26, '#8be9ff', 'left', '800'); SKIPT = false; gemIcon(h.gems.x + 13, 48, 14);
 }
 const infoRectOf = it => ({ x: 636, y: wsTop() + it.y - wsScroll, w: 60, h: 44 });
-function wsHead(it, y) { ctx.fillStyle = '#6f7bc4'; rr(24, y + 8, 5, 24, 2); ctx.fill(); text(it.text, 40, y + 20, 22, '#c8d0ff', 'left', '800', 560); if (it.info) infoIcon(666, y + 22, 14); }
+function wsHead(it, y) { ctx.fillStyle = '#6f7bc4'; rr(24, y + 8, 5, 24, 2); ctx.fill(); text(it.text, 40, y + 20, 22, '#c8d0ff', 'left', '800', 360); if (it.info) infoIcon(666, y + 22, 14); else if (it.right) text(it.right, 696, y + 21, 17, '#8b95c9', 'right', '600', 300); }
 const NEUTRAL = '#2d3566';
 const wsCard = (y, h, o = {}) => colorCard(24, y, 672, h, o.col || NEUTRAL, o.w || 2, o.glow === undefined ? 0.1 : o.glow);
 function wsPips(x, y, n, max, col) { for (let i = 0; i < max; i++) { ctx.beginPath(); ctx.arc(x + i * 24, y, 8, 0, 7); if (i < n) { ctx.fillStyle = col; ctx.fill(); } else { ctx.lineWidth = 2; ctx.strokeStyle = '#4a5590'; ctx.stroke(); } } }
@@ -993,19 +1009,22 @@ function wsDrawItem(it) {
       wrap(c.locked ? 'Locked: unlock Rare Relics first' : sp.text(), c.x + c.w / 2, y + 112, c.w - 24, 22, 18, c.locked ? '#9db4ff' : '#c8d0ff'); });
     for (const b of it.btns) { if (b.o) stateBtn(b.x, y + b.y, b.w, b.h, b.label, b.o); else btn(b.x, y + b.y, b.w, b.h, b.label, b.on, b.col, b.size); } return;
   }
-  // the Missions list (daily, weekly, progression) draws as before
+  if (it.k === 'claimall') { wsCard(y, it.h, { col: '#7dffb0', w: 3, glow: 0.3 }); text(it.n + ' rewards waiting', 360, y + 22, 20, '#c8d0ff', 'center', '700', 600); drawBtns(it, y); return; }
+  if (it.k === 'completedrow') { rr(24, y, 672, it.h, 14); ctx.fillStyle = '#0d1236'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#2d3566'; ctx.stroke(); ctx.beginPath(); if (it.open) { ctx.moveTo(660, y + 32); ctx.lineTo(672, y + 22); ctx.lineTo(684, y + 32); } else { ctx.moveTo(660, y + 22); ctx.lineTo(672, y + 32); ctx.lineTo(684, y + 22); } ctx.lineWidth = 3; ctx.strokeStyle = '#8b95c9'; ctx.stroke(); text(it.label + ' (' + it.n + ')', 48, y + 29, 22, '#8b95c9', 'left', '700', 560); return; }
+  if (it.k === 'morerow') { text(it.n + ' more to discover', 360, y + 22, 19, '#6f7bc4', 'center', '600', 600); return; }
   if (it.k === 'mission') {
-    wsCard(y, it.h, { col: it.claimed ? '#3a4580' : it.done ? '#7dffb0' : it.col, w: 3, glow: it.claimed ? 0.1 : 0.3 });
+    const ready = it.done && !it.claimed; wsCard(y, it.h, { col: it.claimed ? '#3a4580' : ready ? '#7dffb0' : undefined, w: ready ? 3 : 2, glow: ready ? 0.3 : it.claimed ? 0.05 : 0.1 });
     text(it.title, 48, y + 34, 24, it.claimed ? '#8b95c9' : '#ffffff', 'left', '800', 396);
-    const f = Math.min(1, it.val / it.need); rr(48, y + 54, 300, 16, 8); ctx.fillStyle = '#0c1030'; ctx.fill(); if (f > 0) { rr(48, y + 54, Math.max(16, 300 * f), 16, 8); ctx.fillStyle = it.done ? '#7dffb0' : it.col; ctx.fill(); }
+    const f = Math.min(1, it.val / it.need); rr(48, y + 54, 300, 16, 8); ctx.fillStyle = '#0c1030'; ctx.fill(); if (f > 0) { rr(48, y + 54, Math.max(16, 300 * f), 16, 8); ctx.fillStyle = it.done ? '#7dffb0' : '#6f8bff'; ctx.fill(); }
     SKIPT = true; text(Math.min(it.val, it.need) + '/' + it.need, 358, y + 62, 18, '#c8d0ff', 'left', '700', 90); SKIPT = false;
-    ctx.globalAlpha = it.claimed ? 0.5 : 1; rewardRow(48, y + 98, it.rw, 20); ctx.globalAlpha = 1; drawBtns(it, y); return;
+    ctx.globalAlpha = it.claimed ? 0.5 : 1; rewardRow(48, y + 98, it.rw, 20); ctx.globalAlpha = 1; if (it.claimed) text('CLAIMED', 564, y + 62, 22, '#7dffb0', 'center', '800', 200); drawBtns(it, y); return;
   }
-  if (it.k === 'track') {
-    wsCard(y, it.h, { col: '#ff9d4d', w: 3, glow: 0.3 }); text('Complete all daily missions on different days', 48, y + 34, 23, '#ffffff', 'left', '800', 620);
-    for (let d = 0; d < 7; d++) { const x0 = 48 + d * 90.3; rr(x0, y + 50, 82, 30, 8); ctx.fillStyle = d < it.days ? '#ff9d4d' : '#0c1030'; ctx.fill(); SKIPT = true; text(String(d + 1), x0 + 41, y + 65, 18, d < it.days ? '#10153f' : '#6f7bc4', 'center', '800'); SKIPT = false; }
-    it.steps.forEach((w, q) => { const x0 = 48 + q * 220, got = it.days >= w.need, cl = meta.week.claimed[q]; rr(x0 - 4, y + 96, 200, 128, 12); ctx.fillStyle = hexA(got ? '#7dffb0' : '#ff9d4d', cl ? 0.06 : 0.14); ctx.fill();
-      text('Day ' + w.need, x0 + 96, y + 118, 20, cl ? '#8b95c9' : '#ffffff', 'center', '800'); ctx.globalAlpha = cl ? 0.5 : 1; rewardRow(x0 + 96, y + 148, w.rw, 18, 'center'); ctx.globalAlpha = 1; });
+  if (it.k === 'track') { // the weekly streak: seven days on one line, the milestones right under their own day
+    wsCard(y, it.h); text('Complete all daily missions on different days', 48, y + 32, 22, '#c8d0ff', 'left', '700', 620); SKIPT = true; text(it.days + ' of 7 days', 48, y + 70, 30, '#ffd23f', 'left', '800', 300); SKIPT = false;
+    ctx.strokeStyle = '#2d3566'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(it.circles[0], y + 128); ctx.lineTo(it.circles[6], y + 128); ctx.stroke();
+    if (it.days > 1) { ctx.strokeStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(it.circles[0], y + 128); ctx.lineTo(it.circles[Math.min(6, it.days - 1)], y + 128); ctx.stroke(); }
+    it.circles.forEach((cx, d) => { const on = d < it.days, cur = d === it.days - 1; ctx.beginPath(); ctx.arc(cx, y + 128, cur ? 24 : 20, 0, 7); ctx.fillStyle = on ? '#ffd23f' : '#0c1030'; ctx.fill(); ctx.lineWidth = cur ? 5 : 3; ctx.strokeStyle = on ? (cur ? '#ffffff' : '#ffd23f') : '#2d3566'; ctx.stroke(); SKIPT = true; text(String(d + 1), cx, y + 129, 18, on ? '#10153f' : '#6f7bc4', 'center', '800'); SKIPT = false; });
+    it.steps.forEach((w, q) => { const cx = it.circles[w.need - 1], got = meta.week.claimed[q]; rr(cx - 75, y + 164, 150, 28, 8); ctx.fillStyle = hexA(got ? '#3a4580' : '#ffd23f', 0.14); ctx.fill(); ctx.globalAlpha = got ? 0.5 : 1; rewardRow(cx, y + 178, w.rw, 15, 'center'); ctx.globalAlpha = 1; if (got) text('CLAIMED', cx, y + 218, 16, '#7dffb0', 'center', '800', 140); });
     drawBtns(it, y); return;
   }
   if (it.k === 'prog') {
@@ -2676,6 +2695,7 @@ function drawHandDemo() {
 function wsListClick(c, L) { // a tap inside a scrolling list: an (i), an amulet card, or a card's button
   const top = wsTop(), bot = wsBot(); if (c.y < top || c.y > bot) return false; const cy = c.y - top + wsScroll;
   for (const it of L.items) if (cy >= it.y && cy <= it.y + it.h) {
+    if (it.k === 'completedrow') { missionsOpenSec[it.sec] = !missionsOpenSec[it.sec]; Music.sfx('tab'); return true; }
     if (it.k === 'head' && it.info) { const r = infoRectOf(it); if (inRect(c, r.x, r.y, r.w, r.h)) { openInfo(it.info.title, it.info.text); return true; } }
     if (it.k === 'amrow') for (const cd of it.cards) if (inRect({ x: c.x, y: cy - it.y }, cd.x, 0, cd.w, 150)) { openAmulet(cd.t.id); return true; }
     for (const b of it.btns || []) if (inRect({ x: c.x, y: cy - it.y }, b.x, b.y, b.w, b.h)) { if (!b.on) { Music.sfx('deny'); continue; } const k = b.key, was = meta.equipped.length; b.act(); Music.sfx(k.startsWith('equip:') ? (meta.equipped.length > was ? 'equip' : 'unequip') : k.startsWith('upgrade:') || k.startsWith('perk:') ? 'upgrade' : k === 'shop' ? 'open' : k.startsWith('heat') ? 'click' : k.startsWith('bring:') ? 'equip' : 'buy'); return true; }
@@ -2760,12 +2780,13 @@ const scenes = {
   },
   missions: {
     update(dt) {
+      missionFly.forEach(f => { f.t += dt; }); missionFly = missionFly.filter(f => f.t < 0.7);
       if (pressed('Escape')) scene = 'title'; if (down.has('ArrowDown')) wsScroll += 16; if (down.has('ArrowUp')) wsScroll -= 16;
       const L = wsBuild(), view = wsBot() - wsTop(); wsMax = Math.max(0, L.total - view); wsScroll = Math.max(0, Math.min(wsMax, wsScroll));
       if (!click) return; const c = click; if (inRect(c, SET_BACK.x, SET_BACK.y, SET_BACK.w, SET_BACK.h)) { scene = 'title'; Music.sfx('back'); return; }
       wsListClick(c, L);
     },
-    draw() { bg(); menuBackdrop('#3aa06a', '#2a6a8a'); drawWsHeader('MISSIONS'); wsDrawList(wsBuild(), wsTop(), wsBot()); if (KBD) text('Esc: back   Wheel or Up/Down: scroll', W / 2, 1262, 17, '#6f7bc4', 'center', '600'); },
+    draw() { bg(); menuBackdrop('#3aa06a', '#2a6a8a'); drawWsHeader('MISSIONS'); wsDrawList(wsBuild(), wsTop(), wsBot()); missionFly.forEach(f => { if (f.t < 0) return; const k = Math.min(1, f.t / 0.7), e = k * k * (3 - 2 * k), x = f.x + (f.tx - f.x) * e, yy = f.y + (f.ty - f.y) * e - Math.sin(k * Math.PI) * 60; ctx.globalAlpha = 1 - 0.3 * k; if (f.kind === 'coin') { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(x, yy, 10, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 2; ctx.stroke(); } else gemIcon(x, yy, 12); ctx.globalAlpha = 1; }); if (KBD) text('Esc: back   Wheel or Up/Down: scroll', W / 2, 1262, 17, '#6f7bc4', 'center', '600'); },
   },
   over: {
     update(dt) { // a short beat before taps count, so a stray tap never skips the score; only the buttons on the last card start anything
