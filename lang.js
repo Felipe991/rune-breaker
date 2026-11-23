@@ -287,4 +287,15 @@ window.ES = {
   'Make {n} or more runes of the same element touch and they blast. Bigger sets score more.': 'Junta {n} o más runas del mismo elemento y estallan. Los grupos más grandes puntúan más.',
   'Tap the creature: swat ({n})': 'Toca la criatura: golpear ({n})', 'R{n}  {n}/{n}': 'R{n}  {n}/{n}', 'RELIC': 'RELIQUIA',
   'SHOW BUTTONS': 'MOSTRAR BOTONES',
+  // ---- Workshop (three tabs, amulet sheet) ----
+  'UPGRADES': 'MEJORAS', 'AMULETS': 'AMULETOS', 'PERKS': 'VENTAJAS', 'HEAT': 'CALOR', 'OWNED': 'MIS AMULETOS', 'AVAILABLE': 'A LA VENTA', 'LOCKED': 'BLOQUEADOS',
+  'Shards': 'Fragmentos', 'EQUIPPED  {n} of {n}': 'EQUIPADOS  {n} de {n}', 'ALL SLOTS UNLOCKED': 'TODAS LAS RANURAS ABIERTAS', 'BUY SLOT': 'COMPRAR RANURA', 'MERGE': 'FUSIONAR', 'BUY': 'COMPRAR', 'FULL': 'LLENO',
+  'Not bought yet': 'Aún sin comprar', 'Top level': 'Nivel máximo', 'Level {n}:': 'Nivel {n}:', 'Lv {n}': 'Nv {n}', 'x{n}': 'x{n}', 'max {n}': 'máx {n}', 'Drawback:': 'Contra:', 'MAX STARS': 'ESTRELLAS AL MÁXIMO',
+  'FORGE STAR': 'FORJAR ESTRELLA', 'UNEQUIP': 'DESEQUIPAR', 'EQUIP': 'EQUIPAR', 'UPGRADE': 'MEJORAR', 'No free slot': 'Sin ranura libre', 'Stock full': 'Existencias llenas', 'Unlock Rare Relics': 'Abre las Reliquias raras',
+  'Forge available at level {n}': 'Forja disponible en nivel {n}', 'Forge locked: break a Rare Warden': 'Forja bloqueada: rompe un Guardián raro', 'Locked: finish its mission': 'Bloqueado: completa su misión', 'Locked: found in Warden chests': 'Bloqueado: se encuentra en cofres de Guardián',
+  'Bought with coins and kept forever.': 'Se compran con monedas y se conservan para siempre.', 'A harder run for more coins. More Heat levels open as you finish missions.': 'Una partida más difícil por más monedas. Más niveles de Calor se abren al completar misiones.',
+  'Amulets you own. Tap one to equip it, level it up and forge stars.': 'Los amuletos que tienes. Toca uno para equiparlo, subirlo de nivel y forjar estrellas.', 'Epic and legendary amulets are sold here for gems.': 'Los amuletos épicos y legendarios se venden aquí por gemas.',
+  'Finish the matching mission, or find them in Warden chests.': 'Completa la misión correspondiente, o encuéntralos en cofres de Guardián.', 'Upgrades': 'Mejoras', 'Amulets': 'Amuletos',
+  'Perks are bought with coins and kept forever. Each one shows what it does now and what the next level does.': 'Las ventajas se compran con monedas y se conservan para siempre. Cada una muestra lo que hace ahora y lo que hará el siguiente nivel.',
+  'Tap an amulet to see everything about it: equip it, level it up with coins and dust, and forge stars once it is at its top level.': 'Toca un amuleto para verlo todo: equípalo, súbelo de nivel con monedas y polvo, y forja estrellas cuando llegue a su nivel máximo.',
 };

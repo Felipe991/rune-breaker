@@ -653,7 +653,7 @@ function trinketIcon(id, x, y, r, col) {
   ctx.restore();
 }
 const ownedTrinkets = () => TRINKETS.filter(t => meta.trinkets[t.id]);
-const WS_TOP = 138, SHOP_TOP = 84, WS_BOT = 1108; // the Workshop's scrolling area sits between the header and the footer buttons
+const WS_TOP = 160, SHOP_TOP = 84, WS_BOT = 1108; // the Workshop's scrolling area sits between the header and the footer buttons
 let wsTab = 0, wsScroll = 0, wsMax = 0, wsDrag = null; // two tabs (upgrades, the Vault); one scrolling column of cards
 const SOCKET_COST = () => [[tune.socket2_coins, 'coins'], [tune.socket3_coins, 'coins'], [tune.socket4_gems, 'gems'], [tune.socket5_gems, 'gems']];
 function gemIcon(x, y, r, col = '#8be9ff') { // a round-cut gem: a flat-topped hexagon with a table and facets (dust is a plain rhombus, so the two never look alike)
@@ -892,135 +892,132 @@ function missionItems(add) { // the Missions tab: daily, weekly, then the progre
 }
 function forgeCost(star, rar) { const k = 'forge' + star, sc = [1, 1, tune.dust_scale_epic, tune.dust_scale_legend][rar]; return { shards: tune[k + '_shards'], dust: Math.max(1, Math.round(tune[k + '_dust'] * sc)), coins: tune[k + '_coins'] }; }
 function starIcon(x, y, r, fill, col) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } ctx.closePath(); if (fill) { ctx.fillStyle = col; ctx.fill(); } ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke(); }
-function forgeBuild() { // the Forge: spend shards, dust and coins to put stars on a trinket that is already at its top level
-  const items = []; let y = 8; const add = (it, gap = 14) => { it.y = y; items.push(it); y += it.h + gap; }, open = unlocked('forge');
-  add({ k: 'forgehead', h: 130, open });
-  if (open) {
-    add({ k: 'head', h: 40, col: '#ff7ab8', text: 'ENHANCE   each star adds a level of power' }, 8);
-    ownedTrinkets().forEach(t => {
-      const lv = meta.trinkets[t.id], st = meta.stars[t.id] || 0, max = tune.forge_max_stars, next = st < max ? forgeCost(st + 1, t.rar) : null, ready = lv >= tune.trinket_max_level;
-      const afford = !!next && meta.shards >= next.shards && meta.dust[t.rar] >= next.dust && meta.coins >= next.coins;
-      add({ k: 'forgecard', t, lv, st, max, next, ready, afford, h: 258, btns: [mkBtn('enhance:' + t.id, 48, 206, 624, 42, !next ? 'MAX STARS' : !ready ? 'REACH LEVEL ' + tune.trinket_max_level + ' FIRST' : 'ENHANCE', !!next && ready && afford, '#ff7ab8', 22, () => { meta.shards -= next.shards; meta.dust[t.rar] -= next.dust; meta.coins -= next.coins; meta.stars[t.id] = st + 1; saveMeta(); fanfare(3); Music.sfx('upgrade'); toast('Enhanced!'); })] });
-    });
+// ---- The Workshop: three tabs (Upgrades, Amulets, Supplies). Missions have a screen of their own ----
+const WS_TABS = ['UPGRADES', 'AMULETS', 'SUPPLIES'];
+const wsTabRect = i => ({ x: 24 + i * 228, y: 92, w: 216, h: 52 });
+const wsTop = () => (scene === 'missions' ? 104 : WS_TOP), wsBot = () => (scene === 'missions' ? 1236 : WS_BOT);
+const haveAll = () => ({ coins: meta.coins, gems: meta.gems, dust0: meta.dust[0], dust1: meta.dust[1], dust2: meta.dust[2], dust3: meta.dust[3], shards: meta.shards });
+const sbtn = (key, x, y, w, h, label, o, act) => { const st = btnState(Object.assign({ have: haveAll() }, o)); return { key, x, y, w, h, label, on: st.state === 'actionable', st, o: Object.assign({ have: haveAll() }, o), act }; };
+const WS_HINTS = {
+  0: ['Upgrades', 'Perks are bought with coins and kept forever. Each one shows what it does now and what the next level does.'],
+  1: ['Amulets', 'Tap an amulet to see everything about it: equip it, level it up with coins and dust, and forge stars once it is at its top level.'],
+  2: ['Supplies', 'Buy supplies with coins and bring up to two on a run. They are used up when the run starts, so pick what helps most.'],
+};
+function wsHeaderRects() { // the coin and gem counters are measured, so they never run off the screen (big numbers are shortened)
+  ctx.font = `800 26px ${FONT}`; const gw = 38 + ctx.measureText(fmtN(meta.gems)).width, cw = 38 + ctx.measureText(fmtN(meta.coins)).width; ctx.font = `800 34px ${FONT}`; const tw = ctx.measureText(T(scene === 'missions' ? 'MISSIONS' : 'WORKSHOP')).width;
+  const gems = { x: 696 - gw, y: 28, w: gw, h: 40 }, coins = { x: gems.x - 18 - cw, y: 28, w: cw, h: 40 }; return { back: SET_BACK, coins, gems, titleEnd: 116 + tw };
+}
+function drawWsHeader(title) {
+  backArrow(SET_BACK); text(title, 116, 52, 34, '#ffffff', 'left', '800', 230); const h = wsHeaderRects();
+  ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(h.coins.x + 12, 48, 12, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke(); SKIPT = true; text(fmtN(meta.coins), h.coins.x + 32, 48, 26, '#ffd23f', 'left', '800'); text(fmtN(meta.gems), h.gems.x + 32, 48, 26, '#8be9ff', 'left', '800'); SKIPT = false; gemIcon(h.gems.x + 13, 48, 14);
+}
+const infoRectOf = it => ({ x: 636, y: wsTop() + it.y - wsScroll, w: 60, h: 44 });
+function wsHead(it, y) { ctx.fillStyle = '#6f7bc4'; rr(24, y + 8, 5, 24, 2); ctx.fill(); text(it.text, 40, y + 20, 22, '#c8d0ff', 'left', '800', 560); if (it.info) infoIcon(666, y + 22, 14); }
+const NEUTRAL = '#2d3566';
+const wsCard = (y, h, o = {}) => colorCard(24, y, 672, h, o.col || NEUTRAL, o.w || 2, o.glow === undefined ? 0.1 : o.glow);
+function wsPips(x, y, n, max, col) { for (let i = 0; i < max; i++) { ctx.beginPath(); ctx.arc(x + i * 24, y, 8, 0, 7); if (i < n) { ctx.fillStyle = col; ctx.fill(); } else { ctx.lineWidth = 2; ctx.strokeStyle = '#4a5590'; ctx.stroke(); } } }
+// ---- Amulet groups: what you own, what you can buy, what is still locked
+const amuletGroup = t => (meta.trinkets[t.id] ? 'owned' : t.rar >= 2 && unlocked(t.rar === 2 ? 't_epic' : 't_legend') ? 'available' : 'locked');
+const amuletLockReason = t => (t.rar >= 2 || (t.rar === 1 && !unlocked('t_rare')) ? 'Locked: finish its mission' : 'Locked: found in Warden chests');
+const AM_ORDER = { owned: 0, available: 1, locked: 2 };
+function wsBuildTab() {
+  const items = []; let y = 8; const add = (it, gap = 14) => { it.y = y; items.push(it); y += it.h + gap; };
+  if (wsTab === 0) {
+    add({ k: 'head', h: 44, text: 'PERKS', info: { title: 'PERKS', text: 'Bought with coins and kept forever.' } }, 8);
+    PERKS.forEach(p => { const lv = perk(p.id), cost = tune.perk_cost * (lv + 1); add({ k: 'perk', p, lv, h: 140, btns: lv >= p.max ? [] : [sbtn('perk:' + p.id, 460, 36, 212, 68, 'BUY', { cost: { coins: cost } }, () => { meta.coins -= cost; meta.perks[p.id] = lv + 1; saveMeta(); tone(880, 0.12, 'triangle', 0.3); })] }); });
+    const mh = maxHeat(), h = Math.min(meta.heat, mh);
+    add({ k: 'head', h: 44, text: 'HEAT', info: { title: 'HEAT', text: 'A harder run for more coins. More Heat levels open as you finish missions.' } }, 8);
+    add({ k: 'heat', hv: h, mh, h: 124, btns: [mkBtn('heat-', 516, 32, 70, 60, '-', meta.heat > 0, '#ff9d4d', 34, () => { meta.heat--; saveMeta(); }), mkBtn('heat+', 602, 32, 70, 60, '+', meta.heat < mh, '#ff9d4d', 34, () => { meta.heat++; saveMeta(); })] });
+  } else if (wsTab === 1) {
+    add({ k: 'res', h: 232, btns: [0, 1, 2].map(i => sbtn('merge' + i, 40 + i * 164, 128, 148, 46, 'MERGE', { cost: { ['dust' + i]: tune.dust_merge } }, () => { mergeDust(i); })) });
+    { const cost = meta.sockets < 4 ? SOCKET_COST()[meta.sockets] : null, key = cost && (cost[1] === 'coins' ? 'coins' : 'gems');
+      add({ k: 'slots', h: 196, btns: cost ? [sbtn('socket', 128, 126, 464, 56, 'BUY SLOT', { cost: { [key]: cost[0] } }, () => { if (cost[1] === 'coins') meta.coins -= cost[0]; else meta.gems -= cost[0]; meta.sockets++; saveMeta(); fanfare(2); })] : [] }); }
+    ['owned', 'available', 'locked'].forEach(g => { const ts = TRINKETS.filter(t => amuletGroup(t) === g).sort((a, b) => a.rar - b.rar); if (!ts.length) return;
+      add({ k: 'head', h: 44, text: g.toUpperCase(), info: { title: g.toUpperCase(), text: { owned: 'Amulets you own. Tap one to equip it, level it up and forge stars.', available: 'Epic and legendary amulets are sold here for gems.', locked: 'Finish the matching mission, or find them in Warden chests.' }[g] } }, 8);
+      for (let i = 0; i < ts.length; i += 2) add({ k: 'amrow', h: 150, cards: ts.slice(i, i + 2).map((t, j) => ({ t, group: g, x: 24 + j * 342, w: 330 })) }, 12); });
+    add({ k: 'getgems', h: 64, btns: [mkBtn('shop', 160, 4, 400, 56, 'GET GEMS IN THE SHOP', true, '#ffd23f', 22, () => openShop('workshop'))] });
+  } else {
+    add({ k: 'pack', h: 96, names: meta.bring.slice(0, tune.pack_slots).map(id => SUPPLIES.find(x => x.id === id).name) });
+    for (let i = 0; i < SUPPLIES.length; i += 2) add({ k: 'suprow', h: 214, cards: SUPPLIES.slice(i, i + 2).map((sp, j) => { const own = supplyStock(sp.id), locked = supplyLocked(sp), brought = meta.bring.includes(sp.id), full = own >= tune.sup_cap;
+      return { sp, own, locked, brought, full, x: 24 + j * 342, w: 330, btns: [
+        Object.assign(sbtn('buy_sup:' + sp.id, 12, 150, 186, 52, locked ? 'LOCKED' : full ? 'FULL' : 'BUY', locked ? { locked: 'Unlock Rare Relics' } : full ? { locked: 'Stock full' } : { cost: { coins: sp.price } }, () => buySupply(sp.id)), { cx: 24 + j * 342 }),
+        Object.assign(mkBtn('bring:' + sp.id, 208, 150, 110, 52, brought ? 'BRINGING' : 'BRING', brought || (own > 0 && meta.bring.length < tune.pack_slots), '#7dffb0', 16, () => toggleBring(sp.id)), { cx: 24 + j * 342 })] }; }) }, 12);
+    // the buttons of a card sit in the row's own coordinates, shifted by the card's x
+    items.filter(it => it.k === 'suprow').forEach(it => { it.btns = it.cards.flatMap(c => c.btns.map(b => Object.assign(b, { x: b.x + c.x }))); });
   }
   return { items, total: y + 10 };
 }
-function supplyBuild() { // the Supplies tab: what you hold, what you can buy, and what goes in your pack
-  const items = []; let y = 8; const add = (it, gap = 14) => { it.y = y; items.push(it); y += it.h + gap; };
-  add({ k: 'head', h: 40, col: '#7dffb0', text: 'SUPPLIES   bought with coins, used up on the run you bring them to' }, 8);
-  add({ k: 'pack', h: 96, names: meta.bring.slice(0, tune.pack_slots).map(id => SUPPLIES.find(x => x.id === id).name) });
-  SUPPLIES.forEach(sp => {
-    const own = supplyStock(sp.id), locked = supplyLocked(sp), brought = meta.bring.includes(sp.id), full = own >= tune.sup_cap;
-    add({ k: 'supply', s: sp, own, locked, brought, h: 184, btns: [
-      mkBtn('buy_sup:' + sp.id, 48, 130, 300, 42, locked ? 'LOCKED' : full ? 'FULL' : 'BUY ' + sp.price, !locked && !full && meta.coins >= sp.price, '#ffd23f', 22, () => buySupply(sp.id)),
-      mkBtn('bring:' + sp.id, 372, 130, 300, 42, brought ? 'BRINGING' : 'BRING', brought || (own > 0 && meta.bring.length < tune.pack_slots), '#7dffb0', 22, () => toggleBring(sp.id))] });
-  });
-  return { items, total: y + 10 };
-}
-const WS_HINTS = {
-  0: ['Dust and upgrades', 'Warden chests drop dust. To upgrade a trinket you pay coins and dust of its colour. Five dust of one colour merge into one of the next.'],
-  4: ['Supplies', 'Buy supplies with coins and bring up to two on a run. They are used up when the run starts, so pick what helps most.'],
-  1: ['The Vault', 'Gems buy sockets and powerful trinkets. Epic and legendary trinkets open up by finishing missions first.'],
-  2: ['Missions', 'Finish missions to unlock new Relics, creatures and Wardens. Daily missions pay coins, weekly ones pay gems.'],
-  3: ['The Forge', 'Enhance a trinket that has reached its top level. Each star adds a level of power and costs shards, dust and coins.'],
-};
-function wsBuild() { // a tab's cards, with a one-time hint card on top while tips are on
+function wsBuild() { // a tab's cards, with a one-time hint card on top while tips are on; Missions are a list of their own
+  if (scene === 'missions') { const items = []; let y = 8; missionItems((it, gap = 14) => { it.y = y; items.push(it); y += it.h + gap; }); return { items, total: y + 10 }; }
   const L = wsBuildTab(), h = WS_HINTS[wsTab];
   if (!h || !tipsOn() || meta.hints[wsTab]) return L;
   const H = 218; L.items.forEach(it => { it.y += H + 14; });
   L.items.unshift({ k: 'hint', y: 8, h: H, tab: wsTab, title: h[0], text: h[1], btns: [mkBtn('hint:' + wsTab, 460, 164, 212, 44, 'GOT IT', true, '#9db4ff', 22, () => { meta.hints[wsTab] = true; saveMeta(); })] });
   L.total += H + 14; return L;
 }
-function wsBuildTab() {
-  if (wsTab === 4) return supplyBuild();
-  if (wsTab === 3) return forgeBuild();
-  if (wsTab === 2) { const items = []; let y = 8; missionItems((it, gap = 14) => { it.y = y; items.push(it); y += it.h + gap; }); return { items, total: y + 10 }; }
-  const items = []; let y = 8; const add = (it, gap = 14) => { it.y = y; items.push(it); y += it.h + gap; };
-  const mk = (key, x, by, w, h, label, on, col, size, act) => ({ key, x, y: by, w, h, label, on, col, size, act });
-  if (wsTab === 1) { // the Vault: sockets and gem-priced trinkets
-    const cost = meta.sockets < 4 ? SOCKET_COST()[meta.sockets] : null, afford = cost && (cost[1] === 'coins' ? meta.coins : meta.gems) >= cost[0];
-    add({ k: 'sockets', h: 262, btns: cost ? [mk('socket', 128, 186, 464, 60, 'BUY SOCKET ' + (slots() + 1) + '  (' + cost[0] + (cost[1] === 'coins' ? ' coins)' : ' gems)'), afford, cost[1] === 'coins' ? '#ffd23f' : '#8be9ff', 24, () => { if (cost[1] === 'coins') meta.coins -= cost[0]; else meta.gems -= cost[0]; meta.sockets++; saveMeta(); fanfare(2); })] : [] });
-    add({ k: 'head', h: 40, col: '#c46bff', text: 'VAULT   epic and legendary trinkets' }, 8);
-    vaultTrinkets().forEach(t => { const own = meta.trinkets[t.id], price = vaultPrice(t), locked = !unlocked(t.rar === 2 ? 't_epic' : 't_legend'); add({ k: 'vault', t, own, locked, h: 188, btns: [mk('vault:' + t.id, 48, 136, 624, 42, own ? 'OWNED' : locked ? 'LOCKED: finish its mission' : 'BUY ' + price + ' GEMS', !own && !locked && meta.gems >= price, '#8be9ff', 22, () => { meta.gems -= price; meta.trinkets[t.id] = 1; saveMeta(); fanfare(3); })] }); });
-    add({ k: 'note', h: 80 });
-    add({ k: 'getgems', h: 64, btns: [mk('shop', 160, 0, 400, 56, 'GET GEMS IN THE SHOP', true, '#ffd23f', 22, () => openShop('workshop'))] });
-  } else {
-    const mh = maxHeat(), h = Math.min(meta.heat, mh);
-    add({ k: 'head', h: 40, col: '#3ddc84', text: 'DUST   from Warden chests; upgrades cost coins and dust' }, 8);
-    add({ k: 'dust', h: 178, btns: [0, 1, 2].map(i => mkBtn('merge' + i, 52 + i * 162, 122, 144, 40, 'MERGE ' + tune.dust_merge, meta.dust[i] >= tune.dust_merge, DUST_COL[i + 1], 17, () => { mergeDust(i); })) });
-    { const done = PROG.filter(m => unlocked(m.key)).length; add({ k: 'misum', h: 92, done, btns: [mkBtn('tomissions', 456, 20, 216, 52, 'MISSIONS', true, '#7dffb0', 22, () => { wsTab = 2; wsScroll = 0; })] }); }
-    add({ k: 'head', h: 40, col: '#ff7a3c', text: 'HEAT   a harder run for more coins' }, 8);
-    add({ k: 'heat', hv: h, mh, h: 124, btns: [mk('heat-', 516, 32, 70, 60, '-', meta.heat > 0, '#ff9d4d', 34, () => { meta.heat--; saveMeta(); }), mk('heat+', 602, 32, 70, 60, '+', meta.heat < mh, '#ff9d4d', 34, () => { meta.heat++; saveMeta(); })] });
-    add({ k: 'head', h: 40, col: '#7dffb0', text: 'TRINKETS   slots ' + Math.min(meta.equipped.length, slots()) + '/' + slots() + '   (Warden chests drop more)' }, 8);
-    ownedTrinkets().forEach(t => {
-      const lv = meta.trinkets[t.id], eq = meta.equipped.includes(t.id), cost = upCost(lv), dc = dustCost(lv, t.rar);
-      add({ k: 'trinket', t, lv, eq, cost, h: 188, btns: [
-        mk('equip:' + t.id, 48, 136, 300, 42, eq ? 'UNEQUIP' : 'EQUIP', eq || meta.equipped.length < slots(), '#7dffb0', 22, () => { if (eq) meta.equipped = meta.equipped.filter(x => x !== t.id); else meta.equipped.push(t.id); saveMeta(); }),
-        Object.assign(mk('upgrade:' + t.id, 372, 136, 300, 42, lv >= tune.trinket_max_level ? 'MAX LEVEL' : '', lv < tune.trinket_max_level && meta.coins >= cost && meta.dust[t.rar] >= dc, '#ffd23f', 22, () => { meta.coins -= cost; meta.dust[t.rar] -= dc; meta.trinkets[t.id] = lv + 1; saveMeta(); tone(880, 0.12, 'triangle', 0.3); }), lv < tune.trinket_max_level ? { price: { coins: cost, dust: dc, tier: t.rar } } : {})] });
-    });
-    add({ k: 'head', h: 40, col: '#ffd23f', text: 'PERKS   (bought with coins, kept forever)' }, 8);
-    PERKS.forEach(p => { const lv = perk(p.id), cost = tune.perk_cost * (lv + 1); add({ k: 'perk', p, lv, h: 124, btns: [mk('perk:' + p.id, 460, 28, 212, 68, lv >= p.max ? 'MAX' : 'BUY ' + cost, lv < p.max && meta.coins >= cost, '#ffd23f', 24, () => { meta.coins -= cost; meta.perks[p.id] = lv + 1; saveMeta(); tone(880, 0.12, 'triangle', 0.3); })] }); });
-  }
-  return { items, total: y + 10 };
+function drawBtns(it, y) { for (const b of it.btns || []) { if (b.o) stateBtn(b.x, y + b.y, b.w, b.h, b.label, b.o); else btn(b.x, y + b.y, b.w, b.h, b.label, b.on, b.col, b.size); } }
+function amuletCard(c, y) { // one amulet in the grid: rarity-coloured edge, level and stars, equipped tick
+  const t = c.t, col = RCOL[t.rar], owned = c.group === 'owned', dim = c.group === 'locked', lv = meta.trinkets[t.id] || 0, st = meta.stars[t.id] || 0, eq = meta.equipped.includes(t.id);
+  colorCard(c.x, y, c.w, 150, dim ? '#3a4580' : col, eq ? 4 : 3, dim ? 0.08 : 0.26); ctx.fillStyle = hexA(dim ? '#3a4580' : col, 0.28); ctx.beginPath(); ctx.arc(c.x + 52, y + 56, 34, 0, 7); ctx.fill(); trinketIcon(t.id, c.x + 52, y + 56, 28, dim ? '#6f7bc4' : col);
+  text(t.name, c.x + 100, y + 38, 22, dim ? '#9db4ff' : '#ffffff', 'left', '800', c.w - 110);
+  if (owned) { SKIPT = true; text('Lv ' + lv, c.x + 100, y + 72, 20, '#c8d0ff', 'left', '700', 80); SKIPT = false; for (let q = 0; q < tune.forge_max_stars; q++) starIcon(c.x + 176 + q * 26, y + 70, 9, q < st, '#ff7ab8'); }
+  else if (c.group === 'available') { gemIcon(c.x + 112, y + 72, 12); SKIPT = true; text(String(vaultPrice(t)), c.x + 132, y + 72, 22, meta.gems >= vaultPrice(t) ? '#8be9ff' : '#ff6b7a', 'left', '800'); SKIPT = false; }
+  else { ctx.fillStyle = '#6f7bc4'; rr(c.x + 100, y + 66, 18, 14, 3); ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#6f7bc4'; ctx.beginPath(); ctx.arc(c.x + 109, y + 66, 6, Math.PI, 0); ctx.stroke(); }
+  text(RARITY_NAMES[t.rar], c.x + 20, y + 124, 18, dim ? '#6f7bc4' : col, 'left', '800', 140);
+  if (eq) { ctx.fillStyle = '#7dffb0'; ctx.beginPath(); ctx.arc(c.x + c.w - 28, y + 28, 14, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(c.x + c.w - 35, y + 28); ctx.lineTo(c.x + c.w - 29, y + 34); ctx.lineTo(c.x + c.w - 20, y + 22); ctx.lineWidth = 4; ctx.strokeStyle = '#10153f'; ctx.stroke(); }
 }
 function wsDrawItem(it) {
-  const y = it.y, card = (col, w = 3, glow) => colorCard(24, y, 672, it.h, col, w, glow);
+  const y = it.y;
   if (it.k === 'getgems') { for (const b of it.btns) btn(b.x, y + b.y, b.w, b.h, b.label, b.on, b.col, b.size); return; }
-  if (it.k === 'head') { headBar(it, y, it.col || '#c8d0ff'); return; }
-  if (it.k === 'note') { text('Gems come from each run: 1 per ' + tune.gem_score_per + ' points and ' + tune.gem_per_boss + ' per Warden broken.', 360, y + 24, 20, '#9db4ff', 'center', '600', 620); text('Epic and legendary trinkets are only sold here.', 360, y + 56, 20, '#9db4ff', 'center', '600', 620); return; }
-  if (it.k === 'dust') {
-    card('#3ddc84', 3, 0.22);
-    for (let q = 0; q < 4; q++) { const x0 = 52 + q * 162, col = DUST_COL[q]; rr(x0, y + 16, 144, 98, 14); ctx.fillStyle = hexA(col, 0.18); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = hexA(col, 0.7); ctx.stroke();
-      dustIcon(x0 + 34, y + 56, 24, col); SKIPT = true; text(String(meta.dust[q]), x0 + 64, y + 56, 34, col, 'left', '800', 76); SKIPT = false; text(DUST_NAME[q], x0 + 72, y + 100, 16, col, 'center', '700', 136); }
+  if (it.k === 'head') { wsHead(it, y); return; }
+  if (it.k === 'hint') { wsCard(y, it.h, { col: '#6f8bff', glow: 0.2 }); ctx.fillStyle = '#9db4ff'; ctx.beginPath(); ctx.arc(70, y + 44, 22, 0, 7); ctx.fill(); text('i', 70, y + 46, 30, '#10153f', 'center', '800'); text(it.title, 112, y + 44, 28, '#ffffff', 'left', '800', 560); wrap(it.text, 360, y + 90, 600, 26, 22, '#c8d0ff'); drawBtns(it, y); return; }
+  if (it.k === 'perk') {
+    const maxed = it.lv >= it.p.max; wsCard(y, it.h, { col: maxed ? '#4a5590' : undefined }); text(it.p.name, 48, y + 34, 28, '#ffffff', 'left', '700', 380); wsPips(54, y + 66, it.lv, it.p.max, '#ffd23f');
+    text(it.lv ? it.p.text(it.lv) : 'Not bought yet', 48, y + 96, 19, '#8b95c9', 'left', '600', 400); if (!maxed) { text('→', 48, y + 120, 20, '#ffd23f', 'left', '800'); text(it.p.text(it.lv + 1), 72, y + 120, 20, '#ffffff', 'left', '700', 380); }
+    if (maxed) { rr(460, y + 36, 212, 68, 14); ctx.fillStyle = 'rgba(255,210,63,0.14)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#ffd23f'; ctx.stroke(); text('MAX', 566, y + 70, 28, '#ffd23f', 'center', '800'); }
     drawBtns(it, y); return;
   }
-  if (it.k === 'hint') { card('#9db4ff', 3, 0.25); ctx.fillStyle = '#9db4ff'; ctx.beginPath(); ctx.arc(70, y + 44, 22, 0, 7); ctx.fill(); text('i', 70, y + 46, 30, '#10153f', 'center', '800'); text(it.title, 112, y + 44, 28, '#ffffff', 'left', '800', 560); wrap(it.text, 360, y + 90, 600, 28, 21, '#c8d0ff'); drawBtns(it, y); return; }
-  if (it.k === 'pack') {
-    card('#7dffb0', 3, 0.2); text('Your pack: ' + it.names.length + ' of ' + tune.pack_slots + ' slots', 48, y + 34, 24, '#ffffff', 'left', '800', 620);
-    text(it.names.length ? it.names.join('   +   ') : 'Choose what to bring on your next run', 48, y + 70, 21, it.names.length ? '#7dffb0' : '#9db4ff', 'left', '700', 620); return;
+  if (it.k === 'heat') { wsCard(y, it.h, { col: '#ff7a3c', glow: 0.2 }); text('HEAT ' + it.hv + (it.mh ? ' of ' + it.mh : ''), 48, y + 40, 30, '#ff9d4d', 'left', '800', 440); text(it.mh ? HEAT_TEXT[it.hv] + '  (coins +' + Math.round(tune.heat_coin_bonus * it.hv * 100) + '%)' : 'Heat is locked: finish the Heat missions', 48, y + 86, 20, '#c8d0ff', 'left', '600', 450); drawBtns(it, y); return; }
+  if (it.k === 'res') { // dust (four colours) and Forge shards: only amulets use them
+    wsCard(y, it.h);
+    for (let q = 0; q < 4; q++) { const x0 = 40 + q * 164, col = DUST_COL[q]; rr(x0, y + 16, 148, 100, 14); ctx.fillStyle = hexA(col, 0.16); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = hexA(col, 0.6); ctx.stroke();
+      dustIcon(x0 + 34, y + 54, 22, col); SKIPT = true; text(String(meta.dust[q]), x0 + 62, y + 54, 32, col, 'left', '800', 80); SKIPT = false; text(DUST_NAME[q], x0 + 74, y + 98, 16, col, 'center', '700', 136); }
+    drawBtns(it, y); shardIcon(64, y + 204, 18); text('Shards', 94, y + 204, 20, '#c8d0ff', 'left', '700', 120); SKIPT = true; text(String(meta.shards), 176, y + 204, 28, '#ff7ab8', 'left', '800', 100); SKIPT = false; return;
   }
-  if (it.k === 'supply') {
-    const sp = it.s, col = it.locked ? '#6f7bc4' : sp.col; card(it.brought ? '#7dffb0' : col, it.brought ? 5 : 3, it.locked ? 0.08 : it.brought ? 0.45 : 0.28);
-    ctx.fillStyle = hexA(col, 0.28); ctx.beginPath(); ctx.arc(70, y + 52, 34, 0, 7); ctx.fill(); supplyIcon(sp.id, 70, y + 52, 26, col);
-    text(sp.name, 114, y + 44, 28, '#ffffff', 'left', '700', 330); rr(540, y + 22, 136, 34, 17); ctx.fillStyle = hexA(col, 0.3); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke(); text('Own ' + it.own + ' of ' + tune.sup_cap, 608, y + 40, 18, '#ffffff', 'center', '800', 124);
-    text(it.locked ? 'Locked: unlock Rare Relics first' : sp.text(), 48, y + 98, 21, it.locked ? '#9db4ff' : '#c8d0ff', 'left', '600', 620); drawBtns(it, y); return;
+  if (it.k === 'slots') { // the equipped row: owned slots (with what is in them) and locked ones
+    wsCard(y, it.h); const have = slots(); text('EQUIPPED  ' + Math.min(meta.equipped.length, have) + ' of ' + have, 48, y + 36, 26, '#ffffff', 'left', '800', 460);
+    for (let q = 0; q < 5; q++) { const cx = 91 + q * 134.5, cy = y + 88 - 0, own = q < have, eqId = meta.equipped[q], r0 = 32;
+      ctx.beginPath(); ctx.arc(cx, cy, r0, 0, 7); ctx.fillStyle = own ? '#10153f' : '#0a0e28'; ctx.fill(); ctx.lineWidth = own ? 3 : 2; ctx.strokeStyle = own ? '#6f8bff' : '#2d3566'; if (!own) ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+      if (own && eqId && meta.trinkets[eqId]) trinketIcon(eqId, cx, cy, 20, RCOL[TRINKETS.find(t => t.id === eqId).rar]); else if (!own) { ctx.fillStyle = '#3a4580'; rr(cx - 11, cy - 3, 22, 18, 4); ctx.fill(); ctx.strokeStyle = '#3a4580'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy - 3, 8, Math.PI, 0); ctx.stroke(); } }
+    if (!it.btns.length) text('ALL SLOTS UNLOCKED', 360, y + 156, 22, '#ffc93c', 'center', '700', 600); drawBtns(it, y); return;
   }
-  if (it.k === 'forgehead') {
-    card(it.open ? '#ff7ab8' : '#6f7bc4', 3, it.open ? 0.3 : 0.1); text('THE FORGE', 48, y + 38, 30, it.open ? '#ffffff' : '#c8d0ff', 'left', '800', 420);
-    if (it.open) { shardIcon(70, y + 88, 22); SKIPT = true; text(String(meta.shards), 104, y + 88, 36, '#ff7ab8', 'left', '800', 120); SKIPT = false; text('Forge shards: dropped by Rare and better Wardens', 48, y + 120 - 0, 19, '#c8d0ff', 'left', '600', 620); }
-    else text('Locked: break a Rare Warden or better', 48, y + 84, 22, '#9db4ff', 'left', '700', 620);
-    return;
+  if (it.k === 'amrow') { it.cards.forEach(c => amuletCard(c, y)); return; }
+  if (it.k === 'pack') { wsCard(y, it.h); text('Your pack: ' + it.names.length + ' of ' + tune.pack_slots + ' slots', 48, y + 34, 24, '#ffffff', 'left', '800', 620); text(it.names.length ? it.names.join('   +   ') : 'Choose what to bring on your next run', 48, y + 70, 21, it.names.length ? '#7dffb0' : '#9db4ff', 'left', '700', 620); return; }
+  if (it.k === 'suprow') {
+    it.cards.forEach(c => { const sp = c.sp, col = c.locked ? '#6f7bc4' : sp.col; colorCard(c.x, y, c.w, 214, c.brought ? '#7dffb0' : NEUTRAL, c.brought ? 3 : 2, c.brought ? 0.3 : 0.1);
+      ctx.fillStyle = hexA(col, 0.28); ctx.beginPath(); ctx.arc(c.x + 52, y + 48, 32, 0, 7); ctx.fill(); supplyIcon(sp.id, c.x + 52, y + 48, 24, col);
+      rr(c.x + 38, y + 70, 48, 24, 12); ctx.fillStyle = '#0c1030'; ctx.fill(); SKIPT = true; text('x' + c.own, c.x + 62, y + 83, 17, '#ffffff', 'center', '800', 44); SKIPT = false;
+      text(sp.name, c.x + 100, y + 36, 21, '#ffffff', 'left', '800', c.w - 110); text('max ' + tune.sup_cap, c.x + 100, y + 64, 17, '#8b95c9', 'left', '700', c.w - 110);
+      wrap(c.locked ? 'Locked: unlock Rare Relics first' : sp.text(), c.x + c.w / 2, y + 112, c.w - 24, 22, 18, c.locked ? '#9db4ff' : '#c8d0ff'); });
+    for (const b of it.btns) { if (b.o) stateBtn(b.x, y + b.y, b.w, b.h, b.label, b.o); else btn(b.x, y + b.y, b.w, b.h, b.label, b.on, b.col, b.size); } return;
   }
-  if (it.k === 'forgecard') {
-    const t = it.t, col = RCOL[t.rar], eff = it.lv + it.st; card(it.st ? '#ff7ab8' : col, it.st ? 4 : 3, it.st ? 0.36 : 0.26);
-    ctx.fillStyle = hexA(col, 0.28); ctx.beginPath(); ctx.arc(70, y + 52, 34, 0, 7); ctx.fill(); trinketIcon(t.id, 70, y + 52, 28, col);
-    text(t.name, 114, y + 44, 28, '#ffffff', 'left', '700', 360); for (let q = 0; q < it.max; q++) starIcon(600 + q * 34, y + 40, 13, q < it.st, '#ff7ab8');
-    text('Level ' + it.lv + (it.st ? '  +' + it.st + ' from stars' : ''), 48, y + 98, 19, '#9db4ff', 'left', '700', 620); text(t.gain(eff), 48, y + 126, 21, '#c8d0ff', 'left', '600', 620);
-    if (it.next) { text('Next star: ' + t.gain(eff + 1), 48, y + 154, 19, '#ff9dd0', 'left', '700', 620); const n = it.next; let x = 48; const chip = (ic, v, ok, colr) => { ic(x + 12, y + 184); SKIPT = true; text(String(v), x + 32, y + 184, 20, ok ? colr : '#ff6b7a', 'left', '800'); SKIPT = false; ctx.font = `800 20px ${FONT}`; x += 56 + ctx.measureText(String(v)).width; };
-      chip((a, b) => shardIcon(a, b, 11), n.shards, meta.shards >= n.shards, '#ff7ab8'); chip((a, b) => dustIcon(a, b, 11, DUST_COL[t.rar]), n.dust, meta.dust[t.rar] >= n.dust, DUST_COL[t.rar]); chip((a, b) => { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(a, b, 9, 0, 7); ctx.fill(); }, n.coins, meta.coins >= n.coins, '#ffd23f'); }
-    drawBtns(it, y); return;
-  }
-  if (it.k === 'misum') {
-    card('#7dffb0', 3, 0.2); text('Missions: ' + it.done + ' of ' + PROG.length + ' unlocked', 48, y + 34, 24, '#ffffff', 'left', '800', 400);
-    rr(48, y + 54, 380, 14, 7); ctx.fillStyle = '#0c1030'; ctx.fill(); if (it.done) { rr(48, y + 54, Math.max(14, 380 * it.done / PROG.length), 14, 7); ctx.fillStyle = '#7dffb0'; ctx.fill(); }
-    drawBtns(it, y); return;
-  }
+  // the Missions list (daily, weekly, progression) draws as before
   if (it.k === 'mission') {
-    card(it.claimed ? '#3a4580' : it.done ? '#7dffb0' : it.col, 3, it.claimed ? 0.1 : 0.3);
+    wsCard(y, it.h, { col: it.claimed ? '#3a4580' : it.done ? '#7dffb0' : it.col, w: 3, glow: it.claimed ? 0.1 : 0.3 });
     text(it.title, 48, y + 34, 24, it.claimed ? '#8b95c9' : '#ffffff', 'left', '800', 396);
     const f = Math.min(1, it.val / it.need); rr(48, y + 54, 300, 16, 8); ctx.fillStyle = '#0c1030'; ctx.fill(); if (f > 0) { rr(48, y + 54, Math.max(16, 300 * f), 16, 8); ctx.fillStyle = it.done ? '#7dffb0' : it.col; ctx.fill(); }
     SKIPT = true; text(Math.min(it.val, it.need) + '/' + it.need, 358, y + 62, 18, '#c8d0ff', 'left', '700', 90); SKIPT = false;
     ctx.globalAlpha = it.claimed ? 0.5 : 1; rewardRow(48, y + 98, it.rw, 20); ctx.globalAlpha = 1; drawBtns(it, y); return;
   }
   if (it.k === 'track') {
-    card('#ff9d4d', 3, 0.3); text('Complete all daily missions on different days', 48, y + 34, 23, '#ffffff', 'left', '800', 620);
+    wsCard(y, it.h, { col: '#ff9d4d', w: 3, glow: 0.3 }); text('Complete all daily missions on different days', 48, y + 34, 23, '#ffffff', 'left', '800', 620);
     for (let d = 0; d < 7; d++) { const x0 = 48 + d * 90.3; rr(x0, y + 50, 82, 30, 8); ctx.fillStyle = d < it.days ? '#ff9d4d' : '#0c1030'; ctx.fill(); SKIPT = true; text(String(d + 1), x0 + 41, y + 65, 18, d < it.days ? '#10153f' : '#6f7bc4', 'center', '800'); SKIPT = false; }
     it.steps.forEach((w, q) => { const x0 = 48 + q * 220, got = it.days >= w.need, cl = meta.week.claimed[q]; rr(x0 - 4, y + 96, 200, 128, 12); ctx.fillStyle = hexA(got ? '#7dffb0' : '#ff9d4d', cl ? 0.06 : 0.14); ctx.fill();
       text('Day ' + w.need, x0 + 96, y + 118, 20, cl ? '#8b95c9' : '#ffffff', 'center', '800'); ctx.globalAlpha = cl ? 0.5 : 1; rewardRow(x0 + 96, y + 148, w.rw, 18, 'center'); ctx.globalAlpha = 1; });
     drawBtns(it, y); return;
   }
   if (it.k === 'prog') {
-    const done = it.done, col = done ? '#7dffb0' : '#6f7bc4'; card(col, 3, done ? 0.28 : 0.1);
+    const done = it.done, col = done ? '#7dffb0' : '#6f7bc4'; wsCard(y, it.h, { col, w: 3, glow: done ? 0.28 : 0.1 });
     ctx.fillStyle = hexA(col, 0.3); ctx.beginPath(); ctx.arc(76, y + 52, 28, 0, 7); ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = col; ctx.stroke();
     if (done) { ctx.beginPath(); ctx.moveTo(63, y + 53); ctx.lineTo(72, y + 63); ctx.lineTo(91, y + 40); ctx.lineWidth = 6; ctx.strokeStyle = '#7dffb0'; ctx.lineCap = 'round'; ctx.stroke(); ctx.lineCap = 'butt'; }
     else { ctx.fillStyle = col; rr(65, y + 51, 22, 18, 4); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(76, y + 50, 8, Math.PI, 0); ctx.stroke(); }
@@ -1029,42 +1026,52 @@ function wsDrawItem(it) {
     if (done) text('UNLOCKED', 672, y + 84, 18, '#7dffb0', 'right', '800', 150); else { SKIPT = true; text(it.val + '/' + it.need, 672, y + 84, 18, '#9db4ff', 'right', '700', 150); SKIPT = false; }
     return;
   }
-  if (it.k === 'sockets') { // the socket row
-    card('#ffd23f', 3, 0.34); text('SOCKETS  ' + slots() + '/5', 48, y + 40, 26, '#ffffff', 'left', '700', 400);
-    for (let q = 0; q < 5; q++) { const cx = 91 + q * 134.5, cy = y + 120, have = q < slots(), eqId = meta.equipped[q];
-      ctx.beginPath(); ctx.arc(cx, cy, 38, 0, 7); ctx.fillStyle = have ? '#10153f' : '#0a0e28'; ctx.fill(); ctx.lineWidth = have ? 4 : 2; ctx.strokeStyle = have ? '#ffd23f' : '#2d3566'; if (!have) ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
-      if (have && eqId && meta.trinkets[eqId]) trinketIcon(eqId, cx, cy, 22, RCOL[TRINKETS.find(t => t.id === eqId).rar]);
-      else if (!have) { ctx.fillStyle = '#3a4580'; rr(cx - 12, cy - 4, 24, 20, 4); ctx.fill(); ctx.strokeStyle = '#3a4580'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy - 4, 9, Math.PI, 0); ctx.stroke(); } }
-    if (!it.btns.length) text('ALL SOCKETS UNLOCKED', 360, y + 216, 24, '#ffc93c', 'center', '700', 600);
-    for (const b of it.btns) btn(b.x, y + b.y, b.w, b.h, b.label, b.on, b.col, b.size);
-    return;
-  }
-  if (it.k === 'heat') {
-    card('#ff7a3c', 3, 0.36); text('HEAT ' + it.hv + (it.mh ? ' of ' + it.mh : ''), 48, y + 40, 30, '#ff9d4d', 'left', '800', 440);
-    text(it.mh ? HEAT_TEXT[it.hv] + '  (coins +' + Math.round(tune.heat_coin_bonus * it.hv * 100) + '%)' : 'Heat is locked: finish the Heat missions', 48, y + 86, 20, '#c8d0ff', 'left', '600', 450);
-  } else if (it.k === 'perk') {
-    card(PERK_COLS[PERKS.indexOf(it.p) % PERK_COLS.length], 3, 0.3); text(it.p.name + '  ' + it.lv + '/' + it.p.max, 48, y + 42, 28, '#ffffff', 'left', '700', 380);
-    text(it.lv ? it.p.text(it.lv) : it.p.text(1) + ' (per level)', 48, y + 88, 20, '#c8d0ff', 'left', '600', 380);
-  } else { // a trinket, owned or on sale
-    const t = it.t, col = RCOL[t.rar], lv = it.k === 'vault' ? 1 : it.lv + (meta.stars[t.id] || 0), dim = it.k === 'vault' && (it.own || it.locked);
-    card(dim ? '#3a4580' : it.eq ? '#7dffb0' : col, it.eq ? 5 : 3, it.eq ? 0.5 : dim ? 0.1 : 0.3);
-    ctx.fillStyle = hexA(dim ? '#3a4580' : col, 0.28); ctx.beginPath(); ctx.arc(70, y + 52, 34, 0, 7); ctx.fill();
-    trinketIcon(t.id, 70, y + 52, 28, col); text(t.name, 114, y + 44, 28, '#ffffff', 'left', '700', 360); rr(560, y + 22, 116, 34, 17); ctx.fillStyle = hexA(col, 0.3); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke(); text(it.k === 'vault' ? RARITY[t.rar] : 'Lv ' + it.lv, 618, y + 40, 20, '#ffffff', 'center', '800', 104); if (it.k !== 'vault') for (let q = 0; q < (meta.stars[t.id] || 0); q++) starIcon(534 - q * 26, y + 39, 10, true, '#ff7ab8');
-    text(t.gain(lv), 48, y + 92, 21, '#c8d0ff', 'left', '600', 590); text('Cost: ' + t.cost(lv), 48, y + 118, 19, '#ff9d8d', 'left', '600', 590);
-  }
-  drawBtns(it, y);
 }
-function drawBtns(it, y) { for (const b of it.btns || []) { if (b.price) priceBtn(b, y); else btn(b.x, y + b.y, b.w, b.h, b.label, b.on, b.col, b.size); } }
-function priceBtn(b, y) { // UPGRADE, then what it costs: coins and dust of the trinket's tier (red when you are short)
-  btn(b.x, y + b.y, b.w, b.h, '', b.on, b.col, b.size); const P = b.price, cy = y + b.y + b.h / 2, tx = T('UPGRADE'); ctx.font = `800 19px ${FONT}`;
-  const w1 = ctx.measureText(tx).width, c1 = ctx.measureText(String(P.coins)).width, c2 = ctx.measureText(String(P.dust)).width, g = 14, total = w1 + g + 22 + c1 + g + 22 + c2; let x = b.x + (b.w - total) / 2;
-  ctx.globalAlpha = b.on ? 1 : 0.65; SKIPT = true; text(tx, x, cy, 19, '#ffffff', 'left', '800'); x += w1 + g;
-  ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(x + 8, cy, 8, 0, 7); ctx.fill(); text(String(P.coins), x + 22, cy, 19, meta.coins >= P.coins ? '#ffd23f' : '#ff6b7a', 'left', '800'); x += 22 + c1 + g;
-  dustIcon(x + 8, cy, 9, DUST_COL[P.tier]); text(String(P.dust), x + 22, cy, 19, meta.dust[P.tier] >= P.dust ? DUST_COL[P.tier] : '#ff6b7a', 'left', '800'); SKIPT = false; ctx.globalAlpha = 1;
+// ---- The amulet sheet: everything about one amulet in one place; its actions never leave the Amulets tab ----
+let amuletSheet = null;
+const SHEET = { x: 0, y: 600, w: 720, h: 680 }, SHEET_CLOSE = { x: 644, y: 616, w: 56, h: 56 };
+function openAmulet(id) { amuletSheet = id; Music.sfx('click'); }
+function amuletSheetBtns(id) { // the sheet's buttons, in screen coordinates
+  const t = TRINKETS.find(x => x.id === id); if (!t) return []; const out = [], g = amuletGroup(t), lv = meta.trinkets[id] || 0, st = meta.stars[id] || 0; let y = g === 'locked' ? 990 : 936; const add = (b, h = 64) => { out.push(Object.assign(b, { y, x: 40, w: 640, h })); y += h + 12; };
+  if (g === 'owned') {
+    const eq = meta.equipped.includes(id), free = meta.equipped.length < slots();
+    add(sbtn('equip:' + id, 40, y, 640, 64, eq ? 'UNEQUIP' : 'EQUIP', eq || free ? {} : { locked: 'No free slot' }, () => { if (eq) meta.equipped = meta.equipped.filter(x => x !== id); else meta.equipped.push(id); saveMeta(); }));
+    if (lv < tune.trinket_max_level) { const cost = upCost(lv), dc = dustCost(lv, t.rar); add(sbtn('upgrade:' + id, 40, y, 640, 64, 'UPGRADE', { cost: { coins: cost, ['dust' + t.rar]: dc } }, () => { meta.coins -= cost; meta.dust[t.rar] -= dc; meta.trinkets[id] = lv + 1; saveMeta(); tone(880, 0.12, 'triangle', 0.3); })); }
+    else if (unlocked('forge') && st < tune.forge_max_stars) { const n = forgeCost(st + 1, t.rar); add(sbtn('enhance:' + id, 40, y, 640, 64, 'FORGE STAR', { cost: { shards: n.shards, ['dust' + t.rar]: n.dust, coins: n.coins } }, () => { meta.shards -= n.shards; meta.dust[t.rar] -= n.dust; meta.coins -= n.coins; meta.stars[id] = st + 1; saveMeta(); fanfare(3); Music.sfx('upgrade'); toast('Enhanced!'); })); }
+  } else if (g === 'available') { const price = vaultPrice(t); add(sbtn('vault:' + id, 40, y, 640, 64, 'BUY', { cost: { gems: price } }, () => { meta.gems -= price; meta.trinkets[id] = 1; saveMeta(); fanfare(3); })); }
+  else if (t.rar >= 2) add(sbtn('vault:' + id, 40, y, 640, 64, 'BUY', { locked: 'Finish its mission' }, () => {})); // an epic or legendary amulet that is not open yet: the button says why
+  return out;
 }
-function wsButtonPos(key) { // a test hook: scroll a button into view and return where to tap it
-  const L = wsBuild(); wsMax = Math.max(0, L.total - (WS_BOT - WS_TOP));
-  for (const it of L.items) for (const b of it.btns || []) if (b.key === key) { wsScroll = Math.max(0, Math.min(wsMax, it.y + b.y - 300)); return { x: b.x + b.w / 2, y: WS_TOP + it.y + b.y + b.h / 2 - wsScroll }; }
+const sheetBtn = key => amuletSheetBtns(amuletSheet).find(b => b.key === key) || null;
+function drawAmuletSheet() {
+  if (!amuletSheet) return; const t = TRINKETS.find(x => x.id === amuletSheet); if (!t) { amuletSheet = null; return; }
+  const g = amuletGroup(t), col = RCOL[t.rar], lv = meta.trinkets[t.id] || 0, st = meta.stars[t.id] || 0, eff = lv + st;
+  ctx.fillStyle = 'rgba(4,6,20,0.7)'; ctx.fillRect(0, -VOFF, W, H); rr(SHEET.x, SHEET.y, SHEET.w, SHEET.h, 24); ctx.fillStyle = '#10143a'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = g === 'locked' ? '#3a4580' : col; ctx.stroke();
+  rr(SHEET_CLOSE.x, SHEET_CLOSE.y, SHEET_CLOSE.w, SHEET_CLOSE.h, 14); ctx.fillStyle = 'rgba(10,14,40,0.8)'; ctx.fill(); ctx.beginPath(); ctx.moveTo(SHEET_CLOSE.x + 18, SHEET_CLOSE.y + 18); ctx.lineTo(SHEET_CLOSE.x + 38, SHEET_CLOSE.y + 38); ctx.moveTo(SHEET_CLOSE.x + 38, SHEET_CLOSE.y + 18); ctx.lineTo(SHEET_CLOSE.x + 18, SHEET_CLOSE.y + 38); ctx.lineWidth = 4; ctx.strokeStyle = '#c8d0ff'; ctx.stroke();
+  ctx.fillStyle = hexA(col, 0.28); ctx.beginPath(); ctx.arc(84, 686, 44, 0, 7); ctx.fill(); trinketIcon(t.id, 84, 686, 36, g === 'locked' ? '#6f7bc4' : col);
+  text(t.name, 150, 668, 32, '#ffffff', 'left', '800', 470); text(RARITY_NAMES[t.rar], 150, 706, 20, col, 'left', '800', 200);
+  if (g === 'owned') { SKIPT = true; text('Lv ' + lv, 280, 706, 20, '#c8d0ff', 'left', '700', 100); SKIPT = false; for (let q = 0; q < tune.forge_max_stars; q++) starIcon(372 + q * 28, 704, 10, q < st, '#ff7ab8'); }
+  if (g === 'owned') { const l1 = T('Level ' + lv + ':'); text('Level ' + lv + ':', 40, 776, 21, '#8b95c9', 'left', '700', 160); ctx.font = `700 21px ${FONT}`; const w1 = ctx.measureText(l1).width + 12; text(t.gain(eff), 40 + w1, 776, 21, '#c8d0ff', 'left', '600', 640 - w1);
+    if (lv < tune.trinket_max_level) { text('→', 40, 812, 21, '#ffd23f', 'left', '800'); text('Level ' + (lv + 1) + ':', 66, 812, 21, '#8b95c9', 'left', '700', 160); ctx.font = `700 21px ${FONT}`; const w2 = ctx.measureText(T('Level ' + (lv + 1) + ':')).width + 12; text(t.gain(eff + 1), 66 + w2, 812, 21, '#ffffff', 'left', '700', 614 - w2); } else text('Top level', 40, 812, 21, '#ffd23f', 'left', '700', 640); }
+  else text(t.gain(1), 40, 776, 21, '#c8d0ff', 'left', '600', 640);
+  ctx.fillStyle = '#ff9d8d'; ctx.beginPath(); ctx.moveTo(52, 852); ctx.lineTo(64, 876); ctx.lineTo(40, 876); ctx.closePath(); ctx.fill(); SKIPT = true; text('!', 52, 868, 14, '#10143a', 'center', '800'); SKIPT = false;
+  text('Drawback:', 80, 864, 19, '#ff9d8d', 'left', '800', 140); text(t.cost(Math.max(1, lv)), 200, 864, 19, '#ff9d8d', 'left', '600', 480);
+  amuletSheetBtns(t.id).forEach(b => stateBtn(b.x, b.y, b.w, b.h, b.label, b.o));
+  if (g === 'owned' && lv < tune.trinket_max_level) { if (unlocked('forge')) text('Forge available at level ' + tune.trinket_max_level, 360, 1110 - 8, 18, '#9db4ff', 'center', '600', 640); else text('Forge locked: break a Rare Warden', 360, 1110 - 8, 18, '#9db4ff', 'center', '600', 640); }
+  else if (g === 'owned' && !unlocked('forge')) text('Forge locked: break a Rare Warden', 360, 1110 - 8, 18, '#9db4ff', 'center', '600', 640);
+  else if (g === 'owned' && st >= tune.forge_max_stars) text('MAX STARS', 360, 1030, 20, '#ff7ab8', 'center', '800', 640);
+  else if (g === 'locked') text(amuletLockReason(t), 360, 960, 22, '#9db4ff', 'center', '700', 640);
+}
+function amuletRect(id) { // a test hook: scroll an amulet's card into view and return where it is
+  const L = wsBuild(); wsMax = Math.max(0, L.total - (wsBot() - wsTop()));
+  for (const it of L.items) if (it.k === 'amrow') for (const c of it.cards) if (c.t.id === id) { wsScroll = Math.max(0, Math.min(wsMax, it.y - 200)); return { x: c.x, y: wsTop() + it.y - wsScroll, w: c.w, h: 150 }; }
+  return null;
+}
+function wsButtonPos(key) { // a test hook: scroll a button into view (or open its amulet) and return where to tap it
+  const m = key.match(/^(equip|upgrade|vault|enhance):(.+)$/); if (m) { wsTab = 1; openAmulet(m[2]); const b = sheetBtn(key); return b && { x: b.x + b.w / 2, y: b.y + b.h / 2 }; }
+  amuletSheet = null; if (key.startsWith('claim:')) scene = 'missions'; else if (/^(perk:|heat)/.test(key)) { scene = 'workshop'; wsTab = 0; } else if (/^(merge|socket|shop)/.test(key)) { scene = 'workshop'; wsTab = 1; } else if (/^(buy_sup:|bring:)/.test(key)) { scene = 'workshop'; wsTab = 2; } // the key says which screen a button lives on
+  const L = wsBuild(); wsMax = Math.max(0, L.total - (wsBot() - wsTop()));
+  for (const it of L.items) for (const b of it.btns || []) if (b.key === key) { wsScroll = Math.max(0, Math.min(wsMax, it.y + b.y - 300)); return { x: b.x + b.w / 2, y: wsTop() + it.y + b.y + b.h / 2 - wsScroll }; }
   return null;
 }
 function fmtTime(sec) { const m = Math.floor(sec / 60), r = Math.floor(sec % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
@@ -2441,10 +2448,10 @@ function btnState(o) { // o: { cost: { coins, gems, dust0..dust3 }, have: { same
   const missing = {}; Object.keys(o.cost || {}).forEach(k => { const have = (o.have || {})[k] || 0; if (have < o.cost[k]) missing[k] = o.cost[k] - have; });
   return Object.keys(missing).length ? { state: 'unaffordable', missing } : { state: 'actionable', missing };
 }
-const CUR_COL = { coins: '#ffd23f', gems: '#8be9ff', dust0: DUST_COL[0], dust1: DUST_COL[1], dust2: DUST_COL[2], dust3: DUST_COL[3] };
+const CUR_COL = { shards: '#ff7ab8', coins: '#ffd23f', gems: '#8be9ff', dust0: DUST_COL[0], dust1: DUST_COL[1], dust2: DUST_COL[2], dust3: DUST_COL[3] };
 function curIcon(k, x, y, r) { // the icon of a currency, always drawn next to a price
   if (k === 'coins') { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 2; ctx.stroke(); }
-  else if (k === 'gems') gemIcon(x, y, r); else dustIcon(x, y, r, CUR_COL[k]);
+  else if (k === 'gems') gemIcon(x, y, r); else if (k === 'shards') shardIcon(x, y, r); else dustIcon(x, y, r, CUR_COL[k]);
 }
 function priceTag(cost, missing, cx, y, size, dim) { // "icon 150  icon 10", centred on cx; an amount you are short of is red
   const keys = Object.keys(cost || {}); if (!keys.length) return 0; ctx.font = `800 ${size}px ${FONT}`;
@@ -2476,6 +2483,7 @@ function gearIcon(r) { rr(r.x, r.y, r.w, r.h, 12); ctx.fillStyle = 'rgba(10,14,4
   ctx.beginPath(); ctx.arc(0, 0, R0, 0, 7); ctx.lineWidth = 5; ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, R0 * 0.4, 0, 7); ctx.fill(); ctx.restore(); }
 
 // ---- Settings: sound, music, language, hints ----
+const MISSIONS_BTN = { x: 504, y: 20, w: 192, h: 64 }; // until the main menu is redesigned, Missions are reached from here
 const GEAR = { x: 24, y: 20, w: 64, h: 64 }, PAUSE_GEAR = { x: 636, y: 20, w: 64, h: 64 }, SET_BACK = { x: 24, y: 20, w: 76, h: 64 };
 let settingsFrom = 'title';
 const applyAudioPrefs = () => { if (Music.prefs) Music.prefs(!meta.musicOff, !meta.sfxOff); };
@@ -2510,6 +2518,24 @@ function drawSettings() {
     else for (const [l, label2] of [['en', 'ENGLISH'], ['es', 'ESPAÑOL']]) { const b = settingsRect('lang_' + l), on = LANG === l; rr(b.x, b.y, b.w, b.h, 12); ctx.fillStyle = on ? '#2a3a9a' : '#12163a'; ctx.fill(); ctx.lineWidth = on ? 3 : 2; ctx.strokeStyle = on ? '#ffd23f' : '#2d3566'; ctx.stroke(); SKIPT = true; text(label2, b.x + b.w / 2, b.y + b.h / 2, 20, on ? '#ffffff' : '#9db4ff', 'center', '800'); SKIPT = false; } });
   if (!TOUCH) text('Esc: back', W / 2, 1222, 18, '#6f7bc4');
 }
+function wsListClick(c, L) { // a tap inside a scrolling list: an (i), an amulet card, or a card's button
+  const top = wsTop(), bot = wsBot(); if (c.y < top || c.y > bot) return false; const cy = c.y - top + wsScroll;
+  for (const it of L.items) if (cy >= it.y && cy <= it.y + it.h) {
+    if (it.k === 'head' && it.info) { const r = infoRectOf(it); if (inRect(c, r.x, r.y, r.w, r.h)) { openInfo(it.info.title, it.info.text); return true; } }
+    if (it.k === 'amrow') for (const cd of it.cards) if (inRect({ x: c.x, y: cy - it.y }, cd.x, 0, cd.w, 150)) { openAmulet(cd.t.id); return true; }
+    for (const b of it.btns || []) if (inRect({ x: c.x, y: cy - it.y }, b.x, b.y, b.w, b.h)) { if (!b.on) { Music.sfx('deny'); continue; } const k = b.key, was = meta.equipped.length; b.act(); Music.sfx(k.startsWith('equip:') ? (meta.equipped.length > was ? 'equip' : 'unequip') : k.startsWith('upgrade:') || k.startsWith('perk:') ? 'upgrade' : k === 'shop' ? 'open' : k.startsWith('heat') ? 'click' : k.startsWith('bring:') ? 'equip' : 'buy'); return true; }
+  }
+  return false;
+}
+function wsDrawList(L, top, bot) { // the clipped, scrolling column of cards with its scroll bar, fade and toast
+  const view = bot - top; wsMax = Math.max(0, L.total - view); wsScroll = Math.max(0, Math.min(wsMax, wsScroll));
+  ctx.save(); ctx.beginPath(); ctx.rect(0, top, W, view); ctx.clip(); ctx.translate(0, top - wsScroll);
+  for (const it of L.items) if (it.y + it.h >= wsScroll - 10 && it.y <= wsScroll + view + 10) wsDrawItem(it);
+  ctx.restore();
+  if (wsMax > 0) { const th = Math.max(50, view * view / L.total), ty = top + (view - th) * (wsScroll / wsMax); rr(W - 9, ty, 5, th, 3); ctx.fillStyle = 'rgba(160,180,255,0.45)'; ctx.fill(); } // the scroll bar
+  if (wsScroll < wsMax - 4) { const g = ctx.createLinearGradient(0, bot - 40, 0, bot); g.addColorStop(0, 'rgba(8,11,31,0)'); g.addColorStop(1, 'rgba(8,11,31,0.95)'); ctx.fillStyle = g; ctx.fillRect(0, bot - 40, W, 40); }
+  if (wsMsg) { rr(110, bot - 62, 500, 46, 23); ctx.fillStyle = 'rgba(6,9,28,0.94)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#7dffb0'; ctx.stroke(); text(wsMsg, W / 2, bot - 39, 24, '#7dffb0', 'center', '700', 470); }
+}
 const scenes = {
   figures: {
     update(dt) { state.t += dt; },
@@ -2528,9 +2554,9 @@ const scenes = {
   },
   settings: { update: updateSettings, draw: drawSettings },
   title: {
-    update() { if (click && inRect(click, GEAR.x, GEAR.y, GEAR.w, GEAR.h)) return openSettings('title'); if (pressed('KeyS') || (click && inRect(click, workshopOpen() ? 390 : 285, 1160, 150, 64))) openShop('title'); else if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, 180, 1160, 190, 64)))) scene = 'workshop'; else if (workshopOpen() && (pressed('KeyD') || (click && inRect(click, 210, 1075, 300, 72)))) startRun(true); else if (pressed('Enter') || pressed('Space') || click) startRun(); },
+    update() { if (click && inRect(click, GEAR.x, GEAR.y, GEAR.w, GEAR.h)) return openSettings('title'); if (workshopOpen() && click && inRect(click, MISSIONS_BTN.x, MISSIONS_BTN.y, MISSIONS_BTN.w, MISSIONS_BTN.h)) { scene = 'missions'; wsScroll = 0; Music.sfx('open'); return; } if (pressed('KeyS') || (click && inRect(click, workshopOpen() ? 390 : 285, 1160, 150, 64))) openShop('title'); else if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, 180, 1160, 190, 64)))) scene = 'workshop'; else if (workshopOpen() && (pressed('KeyD') || (click && inRect(click, 210, 1075, 300, 72)))) startRun(true); else if (pressed('Enter') || pressed('Space') || click) startRun(); },
     draw() {
-      bg(); gearIcon(GEAR); for (let k = 0; k < 5; k++) tile(60 + k * 124, 230 + 14 * Math.sin(clock.now() * 2 + k), 108, k);
+      bg(); gearIcon(GEAR); if (workshopOpen()) { btn(MISSIONS_BTN.x, MISSIONS_BTN.y, MISSIONS_BTN.w, MISSIONS_BTN.h, 'MISSIONS', true, '#7dffb0', 20); const n = claimables(); if (n > 0) { ctx.fillStyle = '#ff4d6a'; ctx.beginPath(); ctx.arc(MISSIONS_BTN.x + MISSIONS_BTN.w - 6, MISSIONS_BTN.y + 6, 13, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); SKIPT = true; text(String(n), MISSIONS_BTN.x + MISSIONS_BTN.w - 6, MISSIONS_BTN.y + 6, 16, '#ffffff', 'center', '800'); SKIPT = false; } } for (let k = 0; k < 5; k++) tile(60 + k * 124, 230 + 14 * Math.sin(clock.now() * 2 + k), 108, k);
       text('RUNE', W / 2, 440, 110, '#ffffff', 'center', '900'); text('BREAKER', W / 2, 540, 110, '#9db4ff', 'center', '900');
       text('chain the runes, chase the score', W / 2, 620, 28, '#8b95c9', 'center', '600');
       CONTROLS.forEach((c, i) => text(c, W / 2, 722 + i * 42, 26, '#c8d0ff', 'center', '600'));
@@ -2565,38 +2591,38 @@ const scenes = {
   workshop: {
     update(dt) {
       wsMsgT = Math.max(0, wsMsgT - dt); if (!wsMsgT) wsMsg = ''; // the toast counts down here, not while drawing, so a kept frame still expires it
+      if (amuletSheet) { // an amulet's sheet is open: it takes every tap
+        if (pressed('Escape')) { amuletSheet = null; return; } if (!click) return; const c = click;
+        if (inRect(c, SHEET_CLOSE.x, SHEET_CLOSE.y, SHEET_CLOSE.w, SHEET_CLOSE.h) || c.y < SHEET.y) { amuletSheet = null; Music.sfx('back'); return; }
+        for (const b of amuletSheetBtns(amuletSheet)) if (inRect(c, b.x, b.y, b.w, b.h)) { if (!b.on) { Music.sfx('deny'); return; } const k = b.key, was = meta.equipped.length; b.act(); Music.sfx(k.startsWith('equip:') ? (meta.equipped.length > was ? 'equip' : 'unequip') : k.startsWith('upgrade:') ? 'upgrade' : 'buy'); return; }
+        return;
+      }
       if (pressed('Escape')) scene = 'title'; if (pressed('Enter')) return startRun();
       if (down.has('ArrowDown')) wsScroll += 16; if (down.has('ArrowUp')) wsScroll -= 16;
       const L = wsBuild(); wsMax = Math.max(0, L.total - (WS_BOT - WS_TOP)); wsScroll = Math.max(0, Math.min(wsMax, wsScroll));
       if (!click) return; const c = click;
+      if (inRect(c, SET_BACK.x, SET_BACK.y, SET_BACK.w, SET_BACK.h)) { scene = 'title'; Music.sfx('back'); return; }
       if (inRect(c, 160, 1124, 400, 70)) return startRun();
-      for (const [x, tab] of [[24, 0], [160, 4], [296, 1], [432, 2], [568, 3]]) if (inRect(c, x, 92, 128, 38)) { wsTab = tab; wsScroll = 0; Music.sfx('tab'); return; }
-      if (inRect(c, 24, 1204, 200, 34)) { meta.tipsOff = !meta.tipsOff; saveMeta(); Music.sfx('click'); return; }
-      if (inRect(c, 234, 1204, 200, 34)) { meta.tips = {}; meta.hints = {}; meta.tipsOff = false; saveMeta(); Music.sfx('click'); return; }
-      if (inRect(c, 444, 1204, 200, 34)) { scene = 'title'; Music.sfx('back'); return; }
-      if (c.y >= WS_TOP && c.y <= WS_BOT) { // a tap on a card's button
-        const cy = c.y - WS_TOP + wsScroll;
-        for (const it of L.items) if (cy >= it.y && cy <= it.y + it.h) for (const b of it.btns || []) if (inRect({ x: c.x, y: cy - it.y }, b.x, b.y, b.w, b.h)) { if (!b.on) { Music.sfx('deny'); continue; } const k = b.key, was = meta.equipped.length; b.act(); Music.sfx(k.startsWith('equip:') ? (meta.equipped.length > was ? 'equip' : 'unequip') : k.startsWith('upgrade:') || k.startsWith('perk:') ? 'upgrade' : k === 'shop' ? 'open' : k.startsWith('heat') ? 'click' : k.startsWith('bring:') ? 'equip' : 'buy'); }
-      }
+      for (let i = 0; i < WS_TABS.length; i++) { const r = wsTabRect(i); if (inRect(c, r.x, r.y, r.w, r.h)) { wsTab = i; wsScroll = 0; Music.sfx('tab'); return; } }
+      wsListClick(c, L);
     },
     draw() {
-      bg(); menuBackdrop(wsTab === 3 ? '#ff7ab8' : wsTab === 2 ? '#3ddc84' : wsTab === 4 ? '#3ddc84' : wsTab ? '#b46bff' : '#36c5ff', wsTab === 3 ? '#ff9d4d' : wsTab === 2 ? '#ffd23f' : wsTab === 4 ? '#36c5ff' : wsTab ? '#ffc93c' : '#3ddc84');
-      text('WORKSHOP', 24, 40, 40, '#ffffff', 'left', '800', 240);
-      btn(24, 92, 128, 38, 'UPGRADES', wsTab === 0, '#ffd23f', 14); btn(160, 92, 128, 38, 'SUPPLIES', wsTab === 4, '#7dffb0', 14); btn(296, 92, 128, 38, 'VAULT', wsTab === 1, '#8be9ff', 14); btn(432, 92, 128, 38, 'MISSIONS', wsTab === 2, '#ffd23f', 14); btn(568, 92, 128, 38, 'FORGE', wsTab === 3, '#ff7ab8', 14);
-      { const n = claimables(); if (n > 0) { ctx.fillStyle = '#ff4d6a'; ctx.beginPath(); ctx.arc(548, 96, 14, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); SKIPT = true; text(String(n), 548, 96, 17, '#ffffff', 'center', '800'); SKIPT = false; } }
-      ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(528, 40, 13, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke(); text(fmtN(meta.coins), 548, 40, 28, '#ffd23f', 'left', '800', 84);
-      gemIcon(648, 40, 14); text(String(meta.gems), 668, 40, 28, '#8be9ff', 'left', '800', 48);
-      const L = wsBuild(), view = WS_BOT - WS_TOP; wsMax = Math.max(0, L.total - view); wsScroll = Math.max(0, Math.min(wsMax, wsScroll));
-      ctx.save(); ctx.beginPath(); ctx.rect(0, WS_TOP, W, view); ctx.clip(); ctx.translate(0, WS_TOP - wsScroll);
-      for (const it of L.items) if (it.y + it.h >= wsScroll - 10 && it.y <= wsScroll + view + 10) wsDrawItem(it);
-      ctx.restore();
-      if (wsMax > 0) { const th = Math.max(50, view * view / L.total), ty = WS_TOP + (view - th) * (wsScroll / wsMax); rr(W - 9, ty, 5, th, 3); ctx.fillStyle = 'rgba(160,180,255,0.45)'; ctx.fill(); } // the scroll bar
-      if (wsScroll < wsMax - 4) { const g = ctx.createLinearGradient(0, WS_BOT - 40, 0, WS_BOT); g.addColorStop(0, 'rgba(8,11,31,0)'); g.addColorStop(1, 'rgba(8,11,31,0.95)'); ctx.fillStyle = g; ctx.fillRect(0, WS_BOT - 40, W, 40); }
-      if (wsMsg) { rr(110, WS_BOT - 62, 500, 46, 23); ctx.fillStyle = 'rgba(6,9,28,0.94)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#7dffb0'; ctx.stroke(); text(wsMsg, W / 2, WS_BOT - 39, 24, '#7dffb0', 'center', '700', 470); }
+      bg(); menuBackdrop('#3a4aa0', '#2a6a8a'); drawWsHeader('WORKSHOP');
+      WS_TABS.forEach((n, i) => { const r = wsTabRect(i), on = wsTab === i; rr(r.x, r.y, r.w, r.h, 12); ctx.fillStyle = on ? '#2a3a9a' : '#12163a'; ctx.fill(); ctx.lineWidth = on ? 3 : 2; ctx.strokeStyle = on ? '#ffd23f' : '#2d3566'; ctx.stroke(); text(n, r.x + r.w / 2, r.y + r.h / 2, 20, on ? '#ffffff' : '#9db4ff', 'center', '800', r.w - 12); });
+      wsDrawList(wsBuild(), WS_TOP, WS_BOT);
       btn(160, 1124, 400, 70, 'START RUN', true, '#7dffb0', 30);
-      btn(24, 1204, 200, 34, meta.tipsOff ? 'TIPS: OFF' : 'TIPS: ON', true, '#9db4ff', 16); btn(234, 1204, 200, 34, 'RESET TIPS', true, '#9db4ff', 16); btn(444, 1204, 200, 34, 'MAIN MENU', true, '#9db4ff', 16);
-      if (!TOUCH) text('Enter: start   Esc: back   Wheel or Up/Down: scroll', W / 2, 1258, 17, '#6f7bc4', 'center', '600');
+      if (KBD) text('Enter: start   Esc: back   Wheel or Up/Down: scroll', W / 2, 1258, 17, '#6f7bc4', 'center', '600');
+      drawAmuletSheet();
     },
+  },
+  missions: {
+    update(dt) {
+      if (pressed('Escape')) scene = 'title'; if (down.has('ArrowDown')) wsScroll += 16; if (down.has('ArrowUp')) wsScroll -= 16;
+      const L = wsBuild(), view = wsBot() - wsTop(); wsMax = Math.max(0, L.total - view); wsScroll = Math.max(0, Math.min(wsMax, wsScroll));
+      if (!click) return; const c = click; if (inRect(c, SET_BACK.x, SET_BACK.y, SET_BACK.w, SET_BACK.h)) { scene = 'title'; Music.sfx('back'); return; }
+      wsListClick(c, L);
+    },
+    draw() { bg(); menuBackdrop('#3aa06a', '#2a6a8a'); drawWsHeader('MISSIONS'); wsDrawList(wsBuild(), wsTop(), wsBot()); if (KBD) text('Esc: back   Wheel or Up/Down: scroll', W / 2, 1262, 17, '#6f7bc4', 'center', '600'); },
   },
   over: {
     update(dt) { // a short beat before taps count, so a stray tap never skips the score; only the buttons on the last card start anything
@@ -2730,9 +2756,9 @@ function tick() {
 // The Workshop, Shop and purchase sheet do not move between taps, so a finished frame is kept and reused until anything on screen changes
 // (this keeps scrolling smooth on slow phones and saves battery). A reused frame is pixel-identical to a fresh draw: framecache.mjs checks that.
 let FRAME_CACHE = true, frameCache = null, frameKey = '';
-const menuFrameKey = () => [scene, !!infoSheet, wsTab, wsScroll, wsMsg, shopMsg, payJob ? payJob.id : '', LANG, canvas.width, canvas.height, VOFF, Math.floor(Date.now() / 60000), JSON.stringify(meta)].join('|'); // the minute is for the reset countdown
+const menuFrameKey = () => [scene, !!infoSheet, amuletSheet, wsTab, wsScroll, wsMsg, shopMsg, payJob ? payJob.id : '', LANG, canvas.width, canvas.height, VOFF, Math.floor(Date.now() / 60000), JSON.stringify(meta)].join('|'); // the minute is for the reset countdown
 function drawFrame() {
-  const cacheable = FRAME_CACHE && (scene === 'workshop' || scene === 'shop' || scene === 'pay');
+  const cacheable = FRAME_CACHE && (scene === 'workshop' || scene === 'missions' || scene === 'shop' || scene === 'pay');
   if (cacheable) { const key = menuFrameKey(); if (frameCache && key === frameKey) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(frameCache, 0, 0); ctx.restore(); return; } frameKey = key; }
   ctx.save(); ctx.translate(0, VOFF); scenes[scene].draw(); drawInfoSheet(); ctx.restore();
   if (cacheable) { frameCache = frameCache || document.createElement('canvas'); if (frameCache.width !== canvas.width || frameCache.height !== canvas.height) { frameCache.width = canvas.width; frameCache.height = canvas.height; } frameCache.getContext('2d').drawImage(canvas, 0, 0); }
