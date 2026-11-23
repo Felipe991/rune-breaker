@@ -298,4 +298,10 @@ window.ES = {
   'Finish the matching mission, or find them in Warden chests.': 'Completa la misión correspondiente, o encuéntralos en cofres de Guardián.', 'Upgrades': 'Mejoras', 'Amulets': 'Amuletos',
   'Perks are bought with coins and kept forever. Each one shows what it does now and what the next level does.': 'Las ventajas se compran con monedas y se conservan para siempre. Cada una muestra lo que hace ahora y lo que hará el siguiente nivel.',
   'Tap an amulet to see everything about it: equip it, level it up with coins and dust, and forge stars once it is at its top level.': 'Toca un amuleto para verlo todo: equípalo, súbelo de nivel con monedas y polvo, y forja estrellas cuando llegue a su nivel máximo.',
+  // ---- Prepare run ----
+  'PREPARE RUN': 'PREPARAR PARTIDA', 'START': 'EMPEZAR', 'BACKPACK': 'MOCHILA', 'GET MORE AMULETS': 'CONSEGUIR MÁS AMULETOS', '{n} of {n} slots': '{n} de {n} huecos', 'HEAT {n} of {n}': 'CALOR {n} de {n}', 'Coins +{n}%': 'Monedas +{n}%',
+  'Move bars shorter': 'Barras de movimiento más cortas', 'Creatures come sooner': 'Las criaturas llegan antes', 'The tide starts earlier': 'La marea empieza antes', 'Tougher Wardens': 'Guardianes más duros', 'A new colour sooner': 'Un color nuevo antes',
+  'Choose an amulet': 'Elige un amuleto', 'Choose a supply': 'Elige un suministro', 'None': 'Ninguno', 'EQUIPPED': 'EQUIPADO', 'Locked': 'Bloqueado', 'SKIP PREPARE': 'SALTAR PREPARAR',
+  'Choose the amulets, the supplies and the Heat for this run, then press START. Your choice is remembered for next time.': 'Elige los amuletos, los suministros y el Calor de esta partida y pulsa EMPEZAR. Tu elección se recuerda para la próxima vez.',
+  'Enter: start   Esc: back': 'Enter: empezar   Esc: volver',
 };
