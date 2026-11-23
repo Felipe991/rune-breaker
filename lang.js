@@ -310,4 +310,5 @@ window.ES = {
   // ---- Missions screen ----
   'CLAIM ALL': 'RECLAMAR TODO', 'DAILY': 'DIARIAS', 'WEEKLY': 'SEMANALES', 'PROGRESS': 'PROGRESO', 'Unlocked ({n})': 'Desbloqueadas ({n})', 'new ones every Monday': 'nuevas cada lunes', 'new ones every day': 'nuevas cada día', '{n} rewards waiting': '{n} recompensas esperando',
   'resets in {n} d {n} h': 'se reinicia en {n} d {n} h', 'resets in {n} h {n} m': 'se reinicia en {n} h {n} min', 'All rewards claimed': 'Todas las recompensas reclamadas', 'Each one opens something new for your runs.': 'Cada una abre algo nuevo para tus partidas.',
+  'Choose one': 'Elige una', 'REROLL  {n} left': 'RELANZAR  quedan {n}',
 };

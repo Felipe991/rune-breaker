@@ -2318,7 +2318,7 @@ function overlays() {
   if ((s.phase === 'relic' || (s.phase === 'tip' && s.tipReturn === 'relic')) && s.choices) {
     const an = Math.min(1, (s.relicAnim || 0) / 0.35), ra = s.relicAnim || 0;
     ctx.fillStyle = 'rgba(4,6,20,0.84)'; ctx.fillRect(0, -VOFF, W, H);
-    text(s.bossPick ? 'WARDEN REWARD' : 'RELIC FOUND', W / 2, 330, 44, '#ffc93c', 'center', '800'); text('Choose one (1, 2, 3 or tap)', W / 2, 376, 24, '#9db4ff');
+    text(s.bossPick ? 'WARDEN REWARD' : 'RELIC FOUND', W / 2, 330, 44, '#ffc93c', 'center', '800'); text(KBD ? 'Choose one (1, 2, 3 or tap)' : 'Choose one', W / 2, 376, 24, '#9db4ff');
     s.choices.forEach((rel, i) => {
       const e = Math.max(0, Math.min(1, an * 1.6 - i * 0.2)), x = OX + i * 200, y = 420 + (1 - e) * 50, col = RCOL[rel.rar], pulse = Math.sin(ra * 4 + i);
       ctx.save(); ctx.globalAlpha = e;
@@ -2330,10 +2330,10 @@ function overlays() {
       }
       ctx.globalAlpha = e;
       text(RARITY[rel.rar].toUpperCase(), x + 88, y + 30, 18 + rel.rar, col); relicIcon(rel.id, x + 88, y + 120, 42 + (rel.rar >= 2 ? pulse * 3 : 0), col);
-      text(rel.name, x + 88, y + 206, 26, '#ffffff', 'center', '700', 164); wrap(rel.text(), x + 88, y + 256, 150, 28, 22, '#c8d0ff'); text(String(i + 1), x + 88, y + 400, 28, col);
+      text(rel.name, x + 88, y + 206, 26, '#ffffff', 'center', '700', 164); wrap(rel.text(), x + 88, y + 256, 150, 28, 22, '#c8d0ff'); if (KBD) text(String(i + 1), x + 88, y + 400, 28, col);
       ctx.restore();
     });
-    btn(240, 880, 240, 56, 'REROLL (R)  ' + s.rerolls + ' left', s.rerolls > 0, '#ffc93c', 22);
+    btn(240, 880, 240, 56, (KBD ? 'REROLL (R)  ' : 'REROLL  ') + s.rerolls + ' left', s.rerolls > 0, '#ffc93c', 22);
   }
   drawChest();
 }
@@ -2651,7 +2651,7 @@ function drawTitle() {
   { const r = titleRect('daily'); if (r) { rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#241c08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#8a6a1a'; ctx.stroke(); titleIcon('daily', r.x + 52, r.y + r.h / 2); text(KBD ? 'DAILY CHALLENGE  (D)' : 'DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#ffffff', 'center', '800', r.w - 130); text(dm.name + (played ? '  best ' + meta.daily.best : '') + (meta.streak > 0 && meta.lastDate === todayStr() ? '  streak ' + meta.streak : ''), r.x + r.w / 2 + 20, r.y + 68, 19, '#e0b030', 'center', '600', r.w - 130); } }
   [['workshop', 'WORKSHOP', 'W'], ['missions', 'MISSIONS', ''], ['shop', 'SHOP', 'S']].forEach(([id, label, key]) => { const r = titleRect(id); if (!r) return; rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#12163a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#3a4580'; ctx.stroke(); titleIcon(id, r.x + r.w / 2, r.y + 30); text(KBD && key ? label + ' (' + key + ')' : label, r.x + r.w / 2, r.y + 64, 18, '#c8d0ff', 'center', '800', r.w - 12);
     if (id === 'missions') { const n = claimables(); if (n > 0) menuBadge(r.x + r.w - 10, r.y + 10, String(n)); } if (id === 'shop' && giftReady()) menuBadge(r.x + r.w - 10, r.y + 10, '!'); });
-  { const r = titleRect('howto'); ctx.beginPath(); ctx.arc(r.x + 40, r.y + r.h / 2, 16, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = '#8b95c9'; ctx.stroke(); SKIPT = true; text('?', r.x + 40, r.y + r.h / 2 + 1, 20, '#8b95c9', 'center', '800'); SKIPT = false; text('How to play', r.x + 70, r.y + r.h / 2, 22, '#8b95c9', 'left', '700', r.w - 80); }
+  { const r = titleRect('howto'); ctx.font = `700 22px ${FONT}`; const tw = ctx.measureText(T('How to play')).width, x0 = W / 2 - (32 + 12 + tw) / 2, cy = r.y + r.h / 2; ctx.beginPath(); ctx.arc(x0 + 16, cy, 16, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = '#8b95c9'; ctx.stroke(); SKIPT = true; text('?', x0 + 16, cy + 1, 20, '#8b95c9', 'center', '800'); SKIPT = false; text('How to play', x0 + 44, cy, 22, '#8b95c9', 'left', '700', tw + 10); } // the link is centred as a group
   if (KBD) text('Enter: play', W / 2, 1240, 17, '#6f7bc4', 'center', '600');
 }
 // ---- How to play: three cards, and the hand that shows the drag on the real board ----
