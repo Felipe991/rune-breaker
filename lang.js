@@ -304,4 +304,7 @@ window.ES = {
   'Choose an amulet': 'Elige un amuleto', 'Choose a supply': 'Elige un suministro', 'None': 'Ninguno', 'EQUIPPED': 'EQUIPADO', 'Locked': 'Bloqueado', 'SKIP PREPARE': 'SALTAR PREPARAR',
   'Choose the amulets, the supplies and the Heat for this run, then press START. Your choice is remembered for next time.': 'Elige los amuletos, los suministros y el Calor de esta partida y pulsa EMPEZAR. Tu elección se recuerda para la próxima vez.',
   'Enter: start   Esc: back': 'Enter: empezar   Esc: volver',
+  // ---- Main menu and How to play ----
+  'PLAY': 'JUGAR', 'DAILY CHALLENGE': 'RETO DIARIO', 'DAILY CHALLENGE  (D)': 'RETO DIARIO  (D)', 'WORKSHOP (W)': 'TALLER (W)', 'SHOP (S)': 'TIENDA (S)', 'How to play': 'Cómo jugar', 'Best: {n}': 'Récord: {n}', 'HOW TO PLAY': 'CÓMO JUGAR', 'WATCH IT ON THE BOARD': 'VERLO EN EL TABLERO', 'OPEN': 'ABRIR',
+  'Drag a piece onto the board': 'Arrastra una pieza al tablero', 'The shadow shows where it lands. Lift your finger to drop it.': 'La sombra muestra dónde caerá. Levanta el dedo para soltarla.', 'A quick tap turns it, so it fits where you want.': 'Un toque rápido la gira, para que encaje donde quieras.', 'Bigger sets blast and score more.': 'Los grupos más grandes estallan y puntúan más.', 'Enter: play': 'Enter: jugar',
 };
