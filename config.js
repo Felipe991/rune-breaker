@@ -225,10 +225,17 @@ window.CONFIG = {
   king_every_3: { value: 3, min: 2, max: 12, step: 1 },          // ...third quarter (adds Storm)
   king_every_4: { value: 2, min: 2, max: 12, step: 1 },          // ...last quarter (adds Tide and Moon)
   king_scale_cap: { value: 3, min: 0, max: 3, step: 1 },         // how many rarity steps of strength its attacks can reach in the later quarters (0 = always the plain version)
-  king_coins_1: { value: 100, min: 0, max: 5000, step: 10 },     // reward for damaging 25% of the King: coins (the chest is Common)
-  king_coins_2: { value: 220, min: 0, max: 5000, step: 10 },     // ...50% (Rare chest)
-  king_coins_3: { value: 400, min: 0, max: 5000, step: 10 },     // ...75% (Epic chest)
-  king_coins_4: { value: 900, min: 0, max: 5000, step: 10 },     // ...broken (Legendary chest, a Trinket, the jackpot)
+  king_coins_1: { value: 50, min: 0, max: 5000, step: 10 },     // reward for damaging 25% of the King: coins (the chest is Common)
+  king_coins_2: { value: 100, min: 0, max: 5000, step: 10 },     // ...50% (Rare chest)
+  king_coins_3: { value: 200, min: 0, max: 5000, step: 10 },     // ...75% (Epic chest)
+  king_coins_4: { value: 500, min: 0, max: 5000, step: 10 },     // ...broken (Legendary chest, a Trinket, the jackpot)
+  king_dust: { value: 1, min: 0, max: 10, step: 1 },             // dust of the chest's own colour in each King chest (the top one is Legendary dust)
+  king_dust_low: { value: 0, min: 0, max: 10, step: 1 },         // dust of the colour one step below (0 = none)
+  king_win_min: { value: 0.08, min: 0, max: 1, step: 0.01 },     // the King's health grows at least this much after you break it
+  king_win_per_left: { value: 0.8, min: 0, max: 4, step: 0.05 }, // ...and this much more per fraction of the clock you had left (50 of 150 s spare = +27%)
+  king_ease: { value: 0.04, min: 0, max: 0.5, step: 0.01 },      // after a loss its extra health eases by this much (never below the base)
+  king_mult_cap: { value: 4, min: 1, max: 20, step: 0.25 },      // the most its health can grow, as a multiple of the base
+  king_coin_cap: { value: 3, min: 1, max: 20, step: 0.25 },      // the gold in its chests grows with its strength, up to this multiple
   king_gems_2: { value: 1, min: 0, max: 50, step: 1 },           // gems in the 50% chest
   king_gems_3: { value: 2, min: 0, max: 50, step: 1 },           // ...75%
   king_gems_4: { value: 5, min: 0, max: 50, step: 1 },           // ...broken
