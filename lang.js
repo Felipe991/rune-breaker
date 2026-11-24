@@ -15,6 +15,7 @@ window.ES_PRE = [
 window.ES_SUF = [
   [' (new!)', ' (¡nuevo!)'], [' leveled to {n}', ' sube a nivel {n}'], [' (max level, +{n} coins)', ' (nivel máx., +{n} monedas)'],
   ["   today's best {n}   +{n} bonus   streak {n}", '   mejor hoy {n}   +{n} bonus   racha {n}'], ["   today's best {n}", '   mejor hoy {n}'],
+  ['  {n}% DONE  streak {n}', '  {n}% HECHO  racha {n}'], ['  {n}%  streak {n}', '  {n}%  racha {n}'], ['  {n}% DONE', '  {n}% HECHO'], ['  {n}%', '  {n}%'],
   ['  best {n}  streak {n}', '  mejor {n}  racha {n}'], ['  best {n}', '  mejor {n}'], ['  streak {n}', '  racha {n}'],
   [' is yours', ' activado'], [' {n}s', ' {n}s'], [' ended', ' terminó'], [' (per level)', ' (por nivel)'], ['  (coins +{n}%)', '  (monedas +{n}%)'], ['  LAST!', '  ¡ÚLTIMA!'],
 ];
@@ -131,6 +132,16 @@ window.ES = {
   'Leech Moth': 'Polilla Sanguijuela', 'Leech Moth!': '¡Polilla Sanguijuela!', 'Bomb Sprite': 'Duende Bomba', 'Bomb Sprite!': '¡Duende Bomba!', 'Hourglass Thief': 'Ladrón del Reloj', 'Hourglass Thief!': '¡Ladrón del Reloj!',
   'Relic Joker': 'Bufón de Reliquias', 'Stone Warden': 'Guardián de Piedra', 'Ember': 'Brasa', 'Leaf': 'Hoja', 'Tide': 'Marea', 'Volt': 'Rayo', 'Moon': 'Luna',
   // ---- daily twists ----
+  // ---- the Daily Challenge: the Elemental King ----
+  'Elemental King': 'Rey Elemental', 'ELEMENTAL KING': 'REY ELEMENTAL', 'DAILY: Elemental King': 'DIARIO: Rey Elemental', 'DAILY CHALLENGE': 'RETO DIARIO', 'DAILY CHALLENGE  (D)': 'RETO DIARIO  (D)',
+  'One boss, one clock: every quarter of its health pays a chest, and breaking it is the jackpot': 'Un jefe, un reloj: cada cuarto de su vida paga un cofre, y romperlo es el premio gordo',
+  'Break it in {n}:{n}': 'Rómpelo en {n}:{n}', 'Every quarter of its health you take pays a chest. Break it for the jackpot.': 'Cada cuarto de su vida que le quites paga un cofre. Rómpelo para llevarte el premio gordo.',
+  "It wields every Warden's power, one more each time you wound it": 'Usa el poder de todos los Guardianes, uno más cada vez que lo hieres',
+  'PHASE': 'FASE', 'KING': 'REY', 'DROP {n}': 'JUGADA {n}', 'KING CHEST': 'COFRE DEL REY', 'THE KING FALLS': 'EL REY CAE', 'THE KING FALLS!': '¡EL REY CAE!', 'the jackpot is yours': 'el premio gordo es tuyo',
+  'THE KING SURVIVES': 'EL REY SOBREVIVE', 'THE KING GROWS ANGRY': 'EL REY SE ENFURECE', 'it learns {n}': 'aprende {n}', 'TIME IS UP': 'SE ACABÓ EL TIEMPO', 'TIME IS UP!': '¡SE ACABÓ EL TIEMPO!',
+  'it learns Ember Tyrant': 'aprende el poder del Tirano de Brasa', 'it learns Storm Warden': 'aprende el poder del Guardián de la Tormenta', 'it learns Tide Leviathan and Hollow Moon': 'aprende el poder del Leviatán de Marea y de la Luna Hueca',
+  '{n}% of its health taken': '{n}% de su vida quitada', 'Take a quarter of it for a reward': 'Quítale un cuarto para ganar una recompensa', 'Reward already taken today': 'Recompensa de hoy ya cobrada',
+  'New reward: Green chest': 'Nueva recompensa: cofre verde', 'New reward: Blue chest': 'Nueva recompensa: cofre azul', 'New reward: Purple chest': 'Nueva recompensa: cofre morado', 'New reward: Yellow chest': 'Nueva recompensa: cofre amarillo',
   'Quick Draw': 'Desenfunde Rápido', 'Stone Age': 'Edad de Piedra', 'Surprise Party': 'Fiesta de Sorpresas', 'Gold Fever': 'Fiebre del Oro', 'Lucky Day': 'Día de Suerte', 'Giant Slayers': 'Cazagigantes', 'Flow Frenzy': 'Frenesí de Flujo',
   'Shorter move bars, a stronger Flow': 'Barras más cortas, flujo más fuerte', 'The tide runs fast and stones are tough early': 'La marea va rápida y las piedras son duras pronto',
   'A surprise every {n} to {n} drops': 'Una sorpresa cada {n} a {n} jugadas', 'Coin runes everywhere, worth double': 'Runas con moneda por todas partes, valen doble', 'Mostly good surprises and {n} rerolls': 'Casi todo sorpresas buenas y {n} relanzamientos',
@@ -210,7 +221,7 @@ window.ES = {
   'Choose what to bring on your next run': 'Elige qué llevar en tu próxima partida', 'BRING': 'LLEVAR', 'BRINGING': 'LLEVANDO', 'FULL': 'LLENO', 'Own {n} of {n}': 'Tienes {n} de {n}', 'Locked: unlock Rare Relics first': 'Bloqueado: abre antes las Reliquias raras',
   'Power Spark': 'Chispa de Poder', 'Calm Tonic': 'Tónico Calmante', 'Time Sand': 'Arena del Tiempo', 'Fortune Scroll': 'Pergamino de Fortuna', 'Combo Primer': 'Cebador de Combo', 'Phoenix Ash': 'Ceniza de Fénix',
   'One element power starts fully charged': 'Un poder elemental empieza cargado', '+{n} s on the move bar for {n} moves': '+{n} s en la barra durante {n} jugadas', 'Your first Relic offer is Rare or better': 'Tu primera oferta de Reliquias es rara o mejor',
-  'Start with a combo of {n}': 'Empiezas con un combo de {n}', 'One free revive this run': 'Un revivir gratis esta partida',
+  'Start with a combo of {n}': 'Empiezas con un combo de {n}', 'Start with a combo of {n} and {n} shields': 'Empiezas con un combo de {n} y {n} escudos', '{n} COLORS +{n}': '{n} COLORES +{n}', 'BIG {n} +{n}': 'GRANDE {n} +{n}', 'One free revive this run': 'Un revivir gratis esta partida',
   'DAILY MISSIONS   resets in {n} h {n} m': 'MISIONES DIARIAS   se renuevan en {n} h {n} min', 'WEEKLY MISSIONS   resets in {n} h {n} m': 'MISIONES SEMANALES   se renuevan en {n} h {n} min',
   'WEEKLY MISSIONS   resets in {n} days': 'MISIONES SEMANALES   se renuevan en {n} días', 'WEEKLY MISSIONS   resets in {n} day': 'MISIONES SEMANALES   se renuevan en {n} día',
   'Joker curses shown': 'Ves las maldiciones del Bufón',

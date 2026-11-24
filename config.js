@@ -128,12 +128,13 @@ window.CONFIG = {
 
   // ---- The combo: sets cleared across moves ----
   combo_step: { value: 0.1, min: 0, max: 0.5, step: 0.01 },      // score multiplier gained per combo point
-  combo_cap: { value: 4, min: 0, max: 10, step: 0.5 },           // most the combo can add to the multiplier
+  warden_combo_cap: { value: 4, min: 0, max: 20, step: 0.5 },      // Warden damage: the most the combo can add to the multiplier (4 = up to x5). The score has no such cap, the damage to a Warden does
+  combo_cap: { value: 100, min: 0, max: 1000, step: 0.5 },       // most the combo can add to the multiplier (100 = in practice no cap: the combo keeps raising the score)
   combo_blocks_per_point: { value: 4, min: 1, max: 12, step: 1 },  // blocks cleared per combo point: a 4-block set adds 1 (+0.1 to the multiplier), a bigger set adds more
   combo_event_count: { value: 1, min: 0, max: 5, step: 1 },       // combo count added for defeating a creature (clearing it or swatting it)
   combo_event_points: { value: 1, min: 0, max: 5, step: 0.5 },    // combo multiplier points added for defeating a creature (each is +combo_step)
   combo_chain_bonus: { value: 0.5, min: 0, max: 3, step: 0.25 },  // combo points a chain link past the first adds (the chain and the combo share one counter; 0 keeps them apart)
-  combo_grace: { value: 1, min: 0, max: 4, step: 1 },            // moves in a row that clear nothing before the combo breaks (0 = any miss breaks it)
+  combo_grace: { value: 2, min: 0, max: 4, step: 1 },            // moves in a row that clear nothing before the combo breaks (0 = any miss breaks it)
 
   // ---- Pieces on offer ----
   queue_size: { value: 2, min: 2, max: 3, step: 1 },             // pieces to choose from each move
@@ -204,8 +205,35 @@ window.CONFIG = {
   combo_t2: { value: 12, min: 3, max: 80, step: 1 },             // ...HOT
   combo_t3: { value: 25, min: 4, max: 120, step: 1 },            // ...BLAZING
   combo_t4: { value: 45, min: 5, max: 200, step: 1 },            // ...FRENZY
+  bonus_c2_count: { value: 1, min: 0, max: 10, step: 1 },        // move bonus, 2 different elements cleared in one move: combo count added
+  bonus_c2_points: { value: 1, min: 0, max: 10, step: 0.5 },     // ... and combo multiplier points added (each is +combo_step)
+  bonus_c3_count: { value: 3, min: 0, max: 10, step: 1 },        // move bonus, 3 or more different elements: combo count added (replaces the 2-element bonus)
+  bonus_c3_points: { value: 3, min: 0, max: 10, step: 0.5 },
+  bonus_big_from: { value: 6, min: 4, max: 30, step: 1 },        // move bonus, a big move: runes cleared in one move (all its sets and chain) from which it applies
+  bonus_big_count: { value: 2, min: 0, max: 10, step: 1 },       // ... combo count added at that size
+  bonus_big_points: { value: 2, min: 0, max: 10, step: 0.5 },
+  bonus_big_step: { value: 2, min: 1, max: 10, step: 1 },        // ... and every this many runes beyond it adds bonus_big_per_step more (count and points)
+  bonus_big_per_step: { value: 1, min: 0, max: 5, step: 0.5 },
   flow_combo_points: { value: 1, min: 0, max: 5, step: 0.5 },    // combo multiplier points a fast clearing move adds
   kill_fast_mult: { value: 2, min: 1, max: 6, step: 0.5 },       // reward multiplier for a fast creature kill
+
+  // ---- Daily Challenge: the Elemental King, one boss against the clock ----
+  king_hp: { value: 8500, min: 1000, max: 100000, step: 250 },   // the King's health, in Warden damage (it does not follow your score)
+  king_time: { value: 150, min: 30, max: 600, step: 5 },         // seconds you have to break it (the clock runs while you play, not during picks)
+  king_every_1: { value: 5, min: 2, max: 12, step: 1 },          // drops between its attacks, first quarter of its health lost (it uses Stone)
+  king_every_2: { value: 5, min: 2, max: 12, step: 1 },          // ...second quarter (adds Ember)
+  king_every_3: { value: 4, min: 2, max: 12, step: 1 },          // ...third quarter (adds Storm)
+  king_every_4: { value: 3, min: 2, max: 12, step: 1 },          // ...last quarter (adds Tide and Moon)
+  king_scale_cap: { value: 2, min: 0, max: 3, step: 1 },         // how many rarity steps of strength its attacks can reach in the later quarters (0 = always the plain version)
+  king_coins_1: { value: 100, min: 0, max: 5000, step: 10 },     // reward for damaging 25% of the King: coins (the chest is Common)
+  king_coins_2: { value: 220, min: 0, max: 5000, step: 10 },     // ...50% (Rare chest)
+  king_coins_3: { value: 400, min: 0, max: 5000, step: 10 },     // ...75% (Epic chest)
+  king_coins_4: { value: 900, min: 0, max: 5000, step: 10 },     // ...broken (Legendary chest, a Trinket, the jackpot)
+  king_gems_2: { value: 1, min: 0, max: 50, step: 1 },           // gems in the 50% chest
+  king_gems_3: { value: 2, min: 0, max: 50, step: 1 },           // ...75%
+  king_gems_4: { value: 5, min: 0, max: 50, step: 1 },           // ...broken
+  king_shards_3: { value: 1, min: 0, max: 20, step: 1 },         // Shards in the 75% chest
+  king_shards_4: { value: 3, min: 0, max: 20, step: 1 },         // ...broken
 
   // ---- Daily Run ----
   daily_bonus: { value: 30, min: 0, max: 300, step: 5 },         // coins for your first Daily Run of a day
@@ -347,12 +375,13 @@ window.CONFIG = {
   sup_calm_price: { value: 150, min: 0, max: 5000, step: 10 },   // Calm Tonic: the tide starts later
   sup_sand_price: { value: 100, min: 0, max: 5000, step: 10 },   // Time Sand: more time on your first moves
   sup_scroll_price: { value: 180, min: 0, max: 5000, step: 10 }, // Fortune Scroll: the first Relic offer is Rare or better
-  sup_primer_price: { value: 120, min: 0, max: 5000, step: 10 }, // Combo Primer: start with a combo
+  sup_primer_price: { value: 160, min: 0, max: 5000, step: 10 }, // Combo Primer: start with a combo
   sup_ash_price: { value: 400, min: 0, max: 5000, step: 10 },    // Phoenix Ash: one free revive
   sup_calm_secs: { value: 60, min: 5, max: 300, step: 5 },       // seconds Calm Tonic delays the tide
   sup_sand_secs: { value: 2.5, min: 0.5, max: 8, step: 0.5 },    // seconds Time Sand adds to the move bar...
   sup_sand_moves: { value: 15, min: 3, max: 60, step: 1 },       // ...for this many moves
   sup_primer_combo: { value: 6, min: 1, max: 30, step: 1 },      // the combo Combo Primer starts you with
+  sup_primer_shield: { value: 2, min: 0, max: 6, step: 1 },     // Shield charges Combo Primer also starts you with (the Shield relic's: each keeps the combo through one move that clears nothing)
   sup_cap: { value: 5, min: 1, max: 20, step: 1 },               // most of each supply you can hold
   pack_slots: { value: 2, min: 1, max: 5, step: 1 },             // supplies you can bring on one run
   // ---- Bosses: types, rarity (chained) and their attacks ----
