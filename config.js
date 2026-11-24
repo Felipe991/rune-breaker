@@ -218,13 +218,13 @@ window.CONFIG = {
   kill_fast_mult: { value: 2, min: 1, max: 6, step: 0.5 },       // reward multiplier for a fast creature kill
 
   // ---- Daily Challenge: the Elemental King, one boss against the clock ----
-  king_hp: { value: 8500, min: 1000, max: 100000, step: 250 },   // the King's health, in Warden damage (it does not follow your score)
+  king_hp: { value: 9000, min: 1000, max: 100000, step: 250 },   // the King's health, in Warden damage (it does not follow your score)
   king_time: { value: 150, min: 30, max: 600, step: 5 },         // seconds you have to break it (the clock runs while you play, not during picks)
   king_every_1: { value: 5, min: 2, max: 12, step: 1 },          // drops between its attacks, first quarter of its health lost (it uses Stone)
   king_every_2: { value: 5, min: 2, max: 12, step: 1 },          // ...second quarter (adds Ember)
-  king_every_3: { value: 4, min: 2, max: 12, step: 1 },          // ...third quarter (adds Storm)
-  king_every_4: { value: 3, min: 2, max: 12, step: 1 },          // ...last quarter (adds Tide and Moon)
-  king_scale_cap: { value: 2, min: 0, max: 3, step: 1 },         // how many rarity steps of strength its attacks can reach in the later quarters (0 = always the plain version)
+  king_every_3: { value: 3, min: 2, max: 12, step: 1 },          // ...third quarter (adds Storm)
+  king_every_4: { value: 2, min: 2, max: 12, step: 1 },          // ...last quarter (adds Tide and Moon)
+  king_scale_cap: { value: 3, min: 0, max: 3, step: 1 },         // how many rarity steps of strength its attacks can reach in the later quarters (0 = always the plain version)
   king_coins_1: { value: 100, min: 0, max: 5000, step: 10 },     // reward for damaging 25% of the King: coins (the chest is Common)
   king_coins_2: { value: 220, min: 0, max: 5000, step: 10 },     // ...50% (Rare chest)
   king_coins_3: { value: 400, min: 0, max: 5000, step: 10 },     // ...75% (Epic chest)

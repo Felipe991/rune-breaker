@@ -595,7 +595,7 @@ function bankRun(s) { // the run is over: coins and loot are kept
   s.banked = true; s.payout = Math.round((s.runCoins + Math.floor(s.score * tune.payout_per_score)) * (1 + tune.heat_coin_bonus * s.heat)); meta.coins += s.payout;
   s.gems = Math.min(tune.gem_cap, Math.floor(s.score / tune.gem_score_per) + s.bossesBeaten * tune.gem_per_boss); // a few gems: score and Wardens broken
   if (s.daily) { // the Daily Run: a best per day, a streak, and a bonus for the first run of the day
-    const today = todayStr(); if (meta.daily.date !== today) meta.daily = { date: today, best: 0, plays: 0, band: 0, frac: 0 };
+    const today = todayStr(); if (meta.daily.date !== today) meta.daily = { date: today, best: 0, plays: 0, band: 0, frac: 0, started: true };
     const first = meta.daily.plays === 0; meta.daily.plays++; meta.daily.best = Math.max(meta.daily.best, s.score); if (s.king) { meta.daily.band = Math.max(meta.daily.band || 0, s.king.band); meta.daily.frac = Math.max(meta.daily.frac || 0, s.king.frac); }
     if (first) { meta.streak = meta.lastDate === yesterdayStr() ? meta.streak + 1 : 1; meta.lastDate = today; s.dailyBonus = tune.daily_bonus + tune.daily_streak_bonus * Math.min(meta.streak, tune.daily_streak_cap); meta.coins += s.dailyBonus; s.payout += s.dailyBonus; s.gems += tune.daily_gems; }
   }
@@ -623,7 +623,7 @@ const dailyMod = () => ({ name: 'Elemental King', text: 'One boss, one clock: ev
 let cfgBackup = null;
 function applyDaily() { const mod = dailyMod(); cfgBackup = {}; for (const k in mod.cfg) { cfgBackup[k] = CONFIG[k].value; CONFIG[k].value = mod.cfg[k]; } }
 function restoreCfg() { if (!cfgBackup) return; for (const k in cfgBackup) CONFIG[k].value = cfgBackup[k]; cfgBackup = null; }
-function startRun(daily) { restoreCfg(); refreshStage(); if (daily) applyDaily(); reset(!!daily); const used = useSupplies(state); if (daily) { kingStart(state); startBossIntro(); } if (used.length) banner('SUPPLIES', used.join(', '), '#7dffb0');
+function startRun(daily) { if (daily && dailyDone()) return; restoreCfg(); refreshStage(); if (daily) applyDaily(); reset(!!daily); const used = useSupplies(state); if (daily) { kingStart(state); startBossIntro(); const t = todayStr(); if (meta.daily.date !== t) meta.daily = { date: t, best: 0, plays: 0, band: 0, frac: 0 }; meta.daily.started = true; saveMeta(); } /* the try is spent the moment the fight starts */ if (used.length) banner('SUPPLIES', used.join(', '), '#7dffb0');
   { const st = stageNow(); if (meta.stageSeen === undefined) meta.stageSeen = st; else if (st > meta.stageSeen) { meta.stageSeen = st; const si = STAGE_INFO[st]; if (si) banner(si.banner, si.sub, si.col); saveMeta(); } } // a new stage is announced at the start of the run it opens
   scene = 'play'; Music.stinger('start'); } // supplies are used when a run really starts (reset() also runs once at page load)
 function btn(x, y, w, h, label, on, col, size = 22) {
@@ -748,7 +748,7 @@ function usePower(k) { // a tap on a full power button: Burn the tallest column,
     if (br >= 0) { const grp = []; for (let c = 0; c < COLS; c++) if (s.grid[br][c]) grp.push({ ce: s.grid[br][c], r: br, c }); done = forceGroup(s, grp, tune.power_mult, 'WASH!', 'the fullest row is washed away', '#5fd3ff'); } }
   else if (k === 3) { const cn = [0, 0, 0, 0, 0]; s.grid.forEach(row => row.forEach(ce => { if (ce && !ce.stone && !ce.wild) cn[ce.c]++; })); const top = cn.indexOf(Math.max(...cn)), grp = [];
     if (cn[top] > 0) { s.grid.forEach((row, r) => row.forEach((ce, c) => { if (ce && !ce.stone && !ce.wild && ce.c === top) grp.push({ ce, r, c }); })); done = forceGroup(s, grp, tune.storm_mult, 'STORM!', NAMES[top] + ' runes are struck', '#ffe27a'); } }
-  else { s.timerOff = true; s.relics.chrono += tune.still_moves - 1; s.flowBoost = tune.still_moves; banner('STILL', 'the clock stops; your next ' + tune.still_moves + ' drops count as fast', '#d9b8ff'); done = true; }
+  else { s.timerOff = true; s.relics.chrono += tune.still_moves - 1; s.flowBoost = tune.still_moves; banner('STILL', (s.king ? 'the move bar stops, not the King clock; your next ' : 'the clock stops; your next ') + tune.still_moves + ' drops count as fast', '#d9b8ff'); done = true; }
   if (!done) { floatText(W / 2, BY + 200, 'NOTHING TO TARGET', '#9db4ff', 28); return false; }
   s.power[k] = 0; s.powerUses[k]++; s.powersUsed++; bumpStat('powers'); s.powerFlash[k] = 1; s.shake = Math.max(s.shake, 12); events.push({ type: 'power', k });
   [() => sweep(300, 1200, 0.35, 'sawtooth', 0.3), () => tone(600, 0.3, 'triangle', 0.3), () => sweep(200, 900, 0.4, 'sine', 0.35), () => { sweep(4000, 200, 0.2, 'sawtooth', 0.3); thud(); }, () => { tone(1046, 0.5, 'sine', 0.3); tone(784, 0.6, 'sine', 0.25, 0.1); }][k]();
@@ -1112,7 +1112,7 @@ function reset(daily) {
   if (state.relicQueue.length) state.phase = 'fall';
   banner('ROUND 1', 'match 4 runes of the same element', '#9db4ff');
 }
-function numColors() { const r = state.round + (tr('golden_rune') ? 1 : 0) + (state.heat >= 3 ? 1 : 0); return Math.min(5, tune.colors_start + (r >= tune.colors_round_a ? 1 : 0) + (r >= tune.colors_round_b ? 1 : 0)); }
+function numColors() { if (state.king) return 5; const r = state.round + (tr('golden_rune') ? 1 : 0) + (state.heat >= 3 ? 1 : 0); return Math.min(5, tune.colors_start + (r >= tune.colors_round_a ? 1 : 0) + (r >= tune.colors_round_b ? 1 : 0)); }
 function fairBias() { return Math.max(tune.fair_min, tune.fair_bias - state.bossesBeaten * tune.fair_decay - (state.round - 1) * tune.ramp_fair_per_round); }
 function pieceMix() { if (fx('static')) return 0.95; return Math.min(tune.ramp_mix_max, tune.piece_mix + (state.round - 1) * tune.ramp_mix_per_round); }
 function colTop(c) { for (let r = 0; r < R; r++) if (state.grid[r][c]) return r; return R; }
@@ -1416,12 +1416,23 @@ function kingChest(band) { // the reward for a band: a chest one step better eac
   return { tier, n: band, king: true, coins: tune['king_coins_' + band], dust, gems: CONFIG['king_gems_' + band] ? tune['king_gems_' + band] : 0, shards: CONFIG['king_shards_' + band] ? tune['king_shards_' + band] : 0, trinket: band >= 4 ? rollTrinket() : null };
 }
 function kingStart(s) { // a fresh fight: the King is there from the first drop, the clock starts with it, and nothing else pushes the player (no tide, no random surprises)
-  s.king = { strikes: 0, since: 0, phase: 0, over: false, won: false, band: 0, frac: 0, limit: tune.king_time };
+  s.king = { strikes: 0, since: 0, phase: 0, over: false, won: false, band: 0, frac: 0, limit: tune.king_time, warned: [] };
   s.boss = { n: 1, type: 'king', tier: 0, hp: tune.king_hp, done: false, pace: 1, wound: 0, king: true }; s.roundLen = 1e9; s.nextTide = 1e9; s.heat = 0; s.banner = null;
 }
 function kingCheck(s) { // after a move: a new quarter of its health gone is announced, and the King gets one more power
   const p = kingPhase(s); if (!s.king || s.king.over || p <= s.king.phase) return;
   s.king.phase = p; const add = KING_POWERS[p].filter(x => !KING_POWERS[p - 1].includes(x)); s.shake = 20; s.banner = null; banner('THE KING GROWS ANGRY', 'it learns ' + add.map(x => bossType(x).name).join(' and '), bossType(add[0]).col); sweep(120, 700, 0.5, 'sawtooth', 0.3); thud(); fanfare(Math.min(3, p));
+}
+const KING_WARN = [90, 60, 30, 15, 5, 4, 3, 2, 1]; // light cues as the clock runs down: 1:30, 1:00, 30s, 15s and the last five seconds
+function kingTimeWarn(s) {
+  const k = s.king, left = k.limit - s.runT; let hit = 0; for (const t of KING_WARN) if (left <= t && !k.warned.includes(t)) { k.warned.push(t); hit = t; } if (!hit) return;
+  const last = hit <= 5, hot = hit <= 15;
+  floatText(W / 2, BY + 30, last ? String(hit) : fmtTime(hit), hot ? '#ff6b7a' : '#ffe08a', last ? 54 : 34);
+  if (last) tone(700 + (6 - hit) * 90, 0.1, 'square', 0.16); else tone(hot ? 520 : 440, 0.16, 'sine', 0.18);
+}
+const dailyDone = () => meta.daily.date === todayStr() && !!(meta.daily.started || meta.daily.plays > 0); // one try per day
+function kingGiveUp(s) { // leaving mid-fight spends the try and pays the quarters taken at once, without the chest scene
+  const k = s.king; k.over = true; k.frac = kingFrac(s); k.band = kingBand(k.frac, false); k.before = meta.daily.date === todayStr() ? meta.daily.band || 0 : 0; if (k.band > k.before) applyChest(kingChest(k.band));
 }
 function kingEnd(won) { // the fight is over (broken, out of time, or the board filled): pay the band reached, but only if it beats today's best
   const s = state, k = s.king; if (!k || k.over) return; k.over = true; k.won = !!won; k.frac = kingFrac(s); k.band = kingBand(k.frac, won);
@@ -1607,6 +1618,7 @@ function applyRelic(rel) {
 }
 function finishRun(quiet) { // the run really ends here: bank the rewards and show the end screen (quiet: no game-over music, for leaving to the menu)
   if (state.banked) return;
+  if (state.king && !state.king.over) kingGiveUp(state);
   const s = state; s.gained = 'Run over';
   if (s.revives === 0 && s.score > cleanBest) { cleanBest = s.score; try { localStorage.setItem('rune-breaker-best-clean', String(cleanBest)); } catch (e) { /* ignore */ } }
   if (s.score > best) { best = s.score; bestRevived = s.revives > 0; s.newBest = true; try { localStorage.setItem('rune-breaker-best-rev', bestRevived ? '1' : '0'); localStorage.setItem('rune-breaker-best', String(best)); } catch (e) { /* ignore */ } }
@@ -2092,6 +2104,7 @@ function updatePlay(dt) {
   if (s.zoom && !s.fin) { s.zoom.k = 1 + (s.zoom.k - 1) * Math.max(0, 1 - realDt * 7); if (s.zoom.k < 1.01) s.zoom = null; } // after the blow the board eases back out // the killing blow's slow motion: the clock is in real time, the game runs slower
   s.t += dt; s.phaseT += dt; if (s.breathT >= 0) s.breathT += dt; updateFx(dt); if (Math.floor(s.runT) !== s.liveT) { s.liveT = Math.floor(s.runT); liveMax(); }
   if (s.phase !== 'relic' && s.phase !== 'chest' && s.phase !== 'joker' && s.phase !== 'jokerReveal' && s.phase !== 'bossIntro' && s.phase !== 'finisher' && s.phase !== 'deathHold' && s.phase !== 'rebirth' && s.totalDrops > 0) { s.runT += dt; tickEffects(dt); } // effects run on play time, not while a choice is open; the clock (and with it the tide) starts with the first piece
+  if (s.king && !s.king.over) kingTimeWarn(s);
   if (s.king && !s.king.over && s.phase === 'input' && s.runT >= s.king.limit) { s.gained = 'Time!'; banner('TIME IS UP', '', '#ff6b7a'); s.king.timeUp = true; kingEnd(false); return; } // out of time: the quarters you took are your reward
   { const P = s.king ? 0 : pressure(); // a warning before the tide gets hard, never a surprise
     if (!s.warnNear && P >= tune.pressure_from && P < 1) { s.warnNear = true; banner('THE TIDE QUICKENS', timeP() > scoreP() ? 'the run is getting long' : best >= tune.pressure_floor ? 'you are nearing your best score' : 'your score is climbing', '#ff9d4d'); }
@@ -2687,7 +2700,7 @@ function updateTitle() {
   if (hit('shop') || pressed('KeyS')) return openShop('title');
   if (workshopOpen() && (hit('workshop') || pressed('KeyW'))) { scene = 'workshop'; Music.sfx('open'); return; }
   if (hit('missions')) { scene = 'missions'; wsScroll = 0; Music.sfx('open'); return; }
-  if (workshopOpen() && (hit('daily') || pressed('KeyD'))) return startRun(true);
+  if (workshopOpen() && (hit('daily') || pressed('KeyD'))) { if (dailyDone()) { Music.sfx('back'); return; } return startRun(true); }
   if (hit('howto')) { openHelp('title'); return; }
   if (hit('play') || pressed('Enter') || pressed('Space')) playNow();
 }
@@ -2700,7 +2713,9 @@ function drawTitle() {
   { const lab = 'Best: ' + fmtN(best); ctx.font = `800 30px ${FONT}`; const w = ctx.measureText(T(lab)).width; titleIcon('trophy', W / 2 - w / 2 - 22, 600); SKIPT = false; text(lab, W / 2 + 16, 600, 30, '#c9a8ff', 'center', '800', 420); } // the record: its own colour, not the coins' gold
   { const r = titleRect('play'); rr(r.x, r.y, r.w, r.h, 20); const g = ctx.createLinearGradient(0, r.y, 0, r.y + r.h); g.addColorStop(0, '#2fa86a'); g.addColorStop(1, '#1d7a4c'); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#9dffc8'; ctx.stroke(); text('PLAY', r.x + r.w / 2, r.y + r.h / 2 + 2, 46, '#ffffff', 'center', '900', r.w - 40); }
   const dm = dailyMod(), played = meta.daily.date === todayStr();
-  { const r = titleRect('daily'); if (r) { rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#241c08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#8a6a1a'; ctx.stroke(); titleIcon('daily', r.x + 52, r.y + r.h / 2); text(KBD ? 'DAILY CHALLENGE  (D)' : 'DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#ffffff', 'center', '800', r.w - 130); text(dm.name + (played ? '  ' + Math.round(100 * (meta.daily.frac || 0)) + '%' + (meta.daily.band >= 4 ? ' DONE' : '') : '') + (meta.streak > 0 && meta.lastDate === todayStr() ? '  streak ' + meta.streak : ''), r.x + r.w / 2 + 20, r.y + 68, 19, '#e0b030', 'center', '600', r.w - 130); } }
+  { const r = titleRect('daily'); if (r && dailyDone()) { rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#12163a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#2d3566'; ctx.stroke(); ctx.globalAlpha = 0.45; titleIcon('daily', r.x + 52, r.y + r.h / 2); ctx.globalAlpha = 1;
+      text('DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#5d678f', 'center', '800', r.w - 130); text(meta.daily.band >= 4 ? 'King broken  back tomorrow' : 'Done today  ' + Math.round(100 * (meta.daily.frac || 0)) + '%  back tomorrow', r.x + r.w / 2 + 20, r.y + 68, 19, '#5d678f', 'center', '600', r.w - 130); }
+    else if (r) { rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#241c08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#8a6a1a'; ctx.stroke(); titleIcon('daily', r.x + 52, r.y + r.h / 2); text(KBD ? 'DAILY CHALLENGE  (D)' : 'DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#ffffff', 'center', '800', r.w - 130); text(dm.name + (played ? '  ' + Math.round(100 * (meta.daily.frac || 0)) + '%' + (meta.daily.band >= 4 ? ' DONE' : '') : '') + (meta.streak > 0 && meta.lastDate === todayStr() ? '  streak ' + meta.streak : ''), r.x + r.w / 2 + 20, r.y + 68, 19, '#e0b030', 'center', '600', r.w - 130); } }
   [['workshop', 'WORKSHOP', 'W'], ['missions', 'MISSIONS', ''], ['shop', 'SHOP', 'S']].forEach(([id, label, key]) => { const r = titleRect(id); if (!r) return; rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#12163a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#3a4580'; ctx.stroke(); titleIcon(id, r.x + r.w / 2, r.y + 30); text(KBD && key ? label + ' (' + key + ')' : label, r.x + r.w / 2, r.y + 64, 18, '#c8d0ff', 'center', '800', r.w - 12);
     if (id === 'missions') { const n = claimables(); if (n > 0) menuBadge(r.x + r.w - 10, r.y + 10, String(n)); } if (id === 'shop' && giftReady()) menuBadge(r.x + r.w - 10, r.y + 10, '!'); });
   { const r = titleRect('howto'); ctx.font = `700 22px ${FONT}`; const tw = ctx.measureText(T('How to play')).width, x0 = W / 2 - (32 + 12 + tw) / 2, cy = r.y + r.h / 2; ctx.beginPath(); ctx.arc(x0 + 16, cy, 16, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = '#8b95c9'; ctx.stroke(); SKIPT = true; text('?', x0 + 16, cy + 1, 20, '#8b95c9', 'center', '800'); SKIPT = false; text('How to play', x0 + 44, cy, 22, '#8b95c9', 'left', '700', tw + 10); } // the link is centred as a group
@@ -2857,8 +2872,10 @@ const scenes = {
         return;
       }
       if (!state.adClaimed && !state.reviveAdDeclined && (pressed('KeyA') || (click && inRect(click, 110, 948, 500, 60)))) return startAd('double', claimDouble, 'over'); // one ask per run end
-      if (click && inRect(click, workshopOpen() ? 470 : 420, 1030, 190, 70)) { scene = 'title'; Music.sfx('back'); return; }
-      if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, 265, 1030, 190, 70)))) scene = 'workshop';
+      const kg = !!state.king; // after the Daily Challenge there is no "run again": it is one try a day
+      if (click && inRect(click, kg || !workshopOpen() ? 420 : 470, 1030, 190, 70)) { scene = 'title'; Music.sfx('back'); return; }
+      if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, kg ? 110 : 265, 1030, 190, 70)))) scene = 'workshop';
+      else if (kg) { if (pressed('KeyR') || pressed('Enter') || pressed('Space')) { scene = 'title'; Music.sfx('back'); } }
       else if (pressed('KeyR') || pressed('Enter') || pressed('Space') || (click && inRect(click, workshopOpen() ? 60 : 110, 1030, 190, 70))) playNow();
     },
     draw() {
@@ -2873,7 +2890,8 @@ const scenes = {
       if (!last) { if (!state.showStats) btn(590, 912, 110, 40, 'SKIP', true, '#6f7bc4', 16); btn(160, 1030, 400, 70, 'NEXT', true, '#7dffb0', 30); }
       else {
         if (!state.adClaimed && !state.reviveAdDeclined) btn(110, 948, 500, 60, (adFree() ? 'DOUBLE COINS  (+' : 'WATCH AD: DOUBLE COINS  (+') + (st.coins || 0) + ')', true, '#ffd23f', 24);
-        if (workshopOpen()) { btn(60, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(265, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(470, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
+        if (state.king) { btn(110, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(420, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
+        else if (workshopOpen()) { btn(60, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(265, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(470, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
         else { btn(110, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(420, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
         if (tune.ad_banner && !adFree()) { ctx.save(); ctx.setLineDash([10, 8]); ctx.lineWidth = 2; ctx.strokeStyle = '#3a4580'; rr(80, 1166, 560, 70, 10); ctx.stroke(); ctx.restore(); text('AD SPACE', W / 2, 1201, 22, '#4a5590', 'center', '700'); } // reserved for a banner ad
       }
