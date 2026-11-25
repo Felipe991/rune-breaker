@@ -597,7 +597,7 @@ function bankRun(s) { // the run is over: coins and loot are kept
   if (s.daily) { // the Daily Run: a best per day, a streak, and a bonus for the first run of the day
     const today = todayStr(); if (meta.daily.date !== today) meta.daily = { date: today, best: 0, plays: 0, band: 0, frac: 0, started: true };
     const first = meta.daily.plays === 0; meta.daily.plays++; meta.daily.best = Math.max(meta.daily.best, s.score); if (s.king) { meta.daily.band = Math.max(meta.daily.band || 0, s.king.band); meta.daily.frac = Math.max(meta.daily.frac || 0, s.king.frac); }
-    if (first) { meta.streak = meta.lastDate === yesterdayStr() ? meta.streak + 1 : 1; meta.lastDate = today; s.dailyBonus = tune.daily_bonus + tune.daily_streak_bonus * Math.min(meta.streak, tune.daily_streak_cap); meta.coins += s.dailyBonus; s.payout += s.dailyBonus; s.gems += tune.daily_gems; }
+    if (first) { meta.streak = meta.lastDate === yesterdayStr() ? meta.streak + 1 : 1; meta.lastDate = today; if (meta.streak % tune.king_token_every === 0) meta.kingToken = 1; s.dailyBonus = tune.daily_bonus + tune.daily_streak_bonus * Math.min(meta.streak, tune.daily_streak_cap); meta.coins += s.dailyBonus; s.payout += s.dailyBonus; s.gems += tune.daily_gems; }
   }
   s.lootCards = [];
   s.lootNames = s.loot.map(id => {
@@ -619,11 +619,11 @@ const dateStr = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2
 const todayStr = () => (/^\d{4}-\d{2}-\d{2}$/.test(params.get('date') || '') ? params.get('date') : dateStr(new Date())); // ?date=2026-11-21 pretends it is another day (for testing)
 function yesterdayStr() { const [y, m, d] = todayStr().split('-').map(Number); return dateStr(new Date(y, m - 1, d - 1)); }
 function dateSeed(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 100000 + 1; }
-const dailyMod = () => ({ name: 'Elemental King', text: 'One boss, one clock: every quarter of its health pays a chest, and breaking it is the jackpot', cfg: {} }); // the Daily Challenge is the same fight for everyone, each day on the same seed
+const dailyMod = () => ({ name: 'Elemental King', text: 'A boss against the clock', cfg: {} }); // the Daily Challenge is the same fight for everyone, each day on the same seed
 let cfgBackup = null;
 function applyDaily() { const mod = dailyMod(); cfgBackup = {}; for (const k in mod.cfg) { cfgBackup[k] = CONFIG[k].value; CONFIG[k].value = mod.cfg[k]; } }
 function restoreCfg() { if (!cfgBackup) return; for (const k in cfgBackup) CONFIG[k].value = cfgBackup[k]; cfgBackup = null; }
-function startRun(daily) { if (daily && dailyDone()) return; restoreCfg(); refreshStage(); if (daily) applyDaily(); reset(!!daily); const used = useSupplies(state); if (daily) { kingStart(state); startBossIntro(); const t = todayStr(); if (meta.daily.date !== t) meta.daily = { date: t, best: 0, plays: 0, band: 0, frac: 0 }; meta.daily.started = true; saveMeta(); } /* the try is spent the moment the fight starts */ if (used.length) banner('SUPPLIES', used.join(', '), '#7dffb0');
+function startRun(daily, retry) { if (daily && !retry && dailyDone()) return; restoreCfg(); refreshStage(); if (daily) applyDaily(); reset(!!daily); const used = useSupplies(state); if (daily) { kingStart(state); state.king.retry = !!retry; startBossIntro(); const t = todayStr(); if (meta.daily.date !== t) meta.daily = { date: t, best: 0, plays: 0, band: 0, frac: 0 }; meta.daily.started = true; saveMeta(); } /* the try is spent the moment the fight starts */ if (used.length) banner('SUPPLIES', used.join(', '), '#7dffb0');
   { const st = stageNow(); if (meta.stageSeen === undefined) meta.stageSeen = st; else if (st > meta.stageSeen) { meta.stageSeen = st; const si = STAGE_INFO[st]; if (si) banner(si.banner, si.sub, si.col); saveMeta(); } } // a new stage is announced at the start of the run it opens
   scene = 'play'; Music.stinger('start'); } // supplies are used when a run really starts (reset() also runs once at page load)
 function btn(x, y, w, h, label, on, col, size = 22) {
@@ -748,7 +748,7 @@ function usePower(k) { // a tap on a full power button: Burn the tallest column,
     if (br >= 0) { const grp = []; for (let c = 0; c < COLS; c++) if (s.grid[br][c]) grp.push({ ce: s.grid[br][c], r: br, c }); done = forceGroup(s, grp, tune.power_mult, 'WASH!', 'the fullest row is washed away', '#5fd3ff'); } }
   else if (k === 3) { const cn = [0, 0, 0, 0, 0]; s.grid.forEach(row => row.forEach(ce => { if (ce && !ce.stone && !ce.wild) cn[ce.c]++; })); const top = cn.indexOf(Math.max(...cn)), grp = [];
     if (cn[top] > 0) { s.grid.forEach((row, r) => row.forEach((ce, c) => { if (ce && !ce.stone && !ce.wild && ce.c === top) grp.push({ ce, r, c }); })); done = forceGroup(s, grp, tune.storm_mult, 'STORM!', NAMES[top] + ' runes are struck', '#ffe27a'); } }
-  else { s.timerOff = true; s.relics.chrono += tune.still_moves - 1; s.flowBoost = tune.still_moves; banner('STILL', (s.king ? 'the move bar stops, not the King clock; your next ' : 'the clock stops; your next ') + tune.still_moves + ' drops count as fast', '#d9b8ff'); done = true; }
+  else { s.timerOff = true; s.relics.chrono += tune.still_moves - 1; s.flowBoost = tune.still_moves; banner('STILL', (s.king ? 'your next ' : 'the clock stops; your next ') + tune.still_moves + ' drops count as fast', '#d9b8ff'); done = true; }
   if (!done) { floatText(W / 2, BY + 200, 'NOTHING TO TARGET', '#9db4ff', 28); return false; }
   s.power[k] = 0; s.powerUses[k]++; s.powersUsed++; bumpStat('powers'); s.powerFlash[k] = 1; s.shake = Math.max(s.shake, 12); events.push({ type: 'power', k });
   [() => sweep(300, 1200, 0.35, 'sawtooth', 0.3), () => tone(600, 0.3, 'triangle', 0.3), () => sweep(200, 900, 0.4, 'sine', 0.35), () => { sweep(4000, 200, 0.2, 'sawtooth', 0.3); thud(); }, () => { tone(1046, 0.5, 'sine', 0.3); tone(784, 0.6, 'sine', 0.25, 0.1); }][k]();
@@ -1372,7 +1372,7 @@ function endChain() {
   if (s.boss && !s.boss.done) {
     const dmg = bossDmgNow(s);
     if (dmg >= s.boss.hp) {
-      if (s.boss.king) { s.boss.done = true; s.bossesBeaten++; bumpStat('wardens'); Music.stinger('bossDown'); banner('THE KING FALLS!', 'the jackpot is yours', '#ffe08a'); fanfare(3); s.shake = 26; slash(W / 2, 166, true); slash(130, 166, true); slash(590, 166, true); s.killed = true; kingEnd(true); }
+      if (s.boss.king) { s.boss.done = true; s.bossesBeaten++; bumpStat('wardens'); Music.stinger('bossDown'); banner('THE KING FALLS!', '', '#ffe08a'); fanfare(3); s.shake = 26; slash(W / 2, 166, true); slash(130, 166, true); slash(590, 166, true); s.killed = true; kingEnd(true); }
       else {
       s.boss.done = true; s.bossesBeaten++; bumpStat('wardens'); const bonus = tune.boss_bonus * s.boss.n; s.score += bonus;
       s.bestBossTier = Math.max(s.bestBossTier, s.boss.tier); s.chestQueue.push(rollChest(s.boss.n, s.boss.tier)); // the chest is opened right after the fight, before the Relic pick
@@ -1413,7 +1413,8 @@ const kingBand = (frac, won) => (won ? 4 : Math.min(3, Math.floor(frac * 4 + 1e-
 function kingPower(s) { const list = KING_POWERS[kingPhase(s)]; return list[s.king.strikes++ % list.length]; } // each attack is one of the powers it has, in turn
 function kingChest(band) { // the reward for a band: a chest one step better each time, a fixed prize (no luck), the last one with a Trinket
   const tier = band - 1, dust = [0, 0, 0, 0]; dust[tier] = tune.king_dust; if (tier > 0) dust[tier - 1] = tune.king_dust_low;
-  return { tier, n: band, king: true, coins: Math.round(tune['king_coins_' + band] * Math.min(tune.king_coin_cap, meta.kingMult || 1)), dust, gems: CONFIG['king_gems_' + band] ? tune['king_gems_' + band] : 0, shards: CONFIG['king_shards_' + band] ? tune['king_shards_' + band] : 0, trinket: band >= 4 ? rollTrinket() : null };
+  const base = band >= 4 ? tune.king_coins_4_min + rng() * (tune.king_coins_4_max - tune.king_coins_4_min) : tune['king_coins_' + band]; // the jackpot's gold is a random amount in a range
+  return { tier, n: band, king: true, coins: Math.round(base * Math.min(tune.king_coin_cap, meta.kingMult || 1)), dust, gems: CONFIG['king_gems_' + band] ? tune['king_gems_' + band] : 0, shards: CONFIG['king_shards_' + band] ? tune['king_shards_' + band] : 0, trinket: band >= 4 ? rollTrinket() : null };
 }
 function kingStart(s) { // a fresh fight: the King is there from the first drop, the clock starts with it, and nothing else pushes the player (no tide, no random surprises)
   s.king = { strikes: 0, since: 0, phase: 0, over: false, won: false, band: 0, frac: 0, limit: tune.king_time, warned: [] };
@@ -1422,7 +1423,7 @@ function kingStart(s) { // a fresh fight: the King is there from the first drop,
 }
 function kingCheck(s) { // after a move: a new quarter of its health gone is announced, and the King gets one more power
   const p = kingPhase(s); if (!s.king || s.king.over || p <= s.king.phase) return;
-  s.king.phase = p; const add = KING_POWERS[p].filter(x => !KING_POWERS[p - 1].includes(x)); s.shake = 20; s.banner = null; banner('THE KING GROWS ANGRY', 'it learns ' + add.map(x => bossType(x).name).join(' and '), bossType(add[0]).col); sweep(120, 700, 0.5, 'sawtooth', 0.3); thud(); fanfare(Math.min(3, p));
+  s.king.phase = p; const add = KING_POWERS[p].filter(x => !KING_POWERS[p - 1].includes(x)); s.shake = 20; s.banner = null; banner('THE KING GROWS ANGRY', '', bossType(add[0]).col); sweep(120, 700, 0.5, 'sawtooth', 0.3); thud(); fanfare(Math.min(3, p));
 }
 const KING_WARN = [90, 60, 30, 15, 5, 4, 3, 2, 1]; // light cues as the clock runs down: 1:30, 1:00, 30s, 15s and the last five seconds
 function kingTimeWarn(s) {
@@ -1431,20 +1432,37 @@ function kingTimeWarn(s) {
   floatText(W / 2, BY + 30, last ? String(hit) : fmtTime(hit), hot ? '#ff6b7a' : '#ffe08a', last ? 54 : 34);
   if (last) tone(700 + (6 - hit) * 90, 0.1, 'square', 0.16); else tone(hot ? 520 : 440, 0.16, 'sine', 0.18);
 }
+// ---- The Daily Challenge's extra try (ruling of /monetization-review): one a day, only while the King stands, by ad (free with Remove Ads) or by a streak token ----
+function retryRoutes() { // how the extra try can be had right now; [] when it cannot
+  const d = meta.daily; if (d.date !== todayStr() || !dailyDone() || (d.band || 0) >= 4 || d.retryUsed) return [];
+  const r = []; if ((meta.kingToken || 0) > 0) r.push('token'); if (adFree()) r.push('free'); else if (platform.adAvailable()) r.push('ad'); return r;
+}
+const retryAvailable = () => retryRoutes().length > 0;
+function startRetry(route) { // same pieces (the date's seed), no gem route; the try is spent when the fight starts, and closing the ad early spends nothing
+  if (!retryRoutes().includes(route)) return;
+  const begin = () => { if (!retryAvailable()) return; if (route === 'token') meta.kingToken = 0; meta.daily.retryUsed = true; saveMeta(); startRun(true, true); };
+  if (route === 'ad') startAd('retry', begin, 'retry'); else begin();
+}
+let retryFrom = 'title';
+function openRetryOffer(from) { retryFrom = from; scene = 'retry'; Music.sfx('open'); }
+function adRects() { // the ad button on the end screen: only the coin-doubling ad (the extra try is offered from the main menu, not here)
+  const dbl = !state.adClaimed && !state.reviveAdDeclined && (!state.king || doubleBase(state) > 0);
+  return { dbl: dbl ? { x: 110, y: 948, w: 500, h: 60 } : null, retry: null };
+}
 const dailyDone = () => meta.daily.date === todayStr() && !!(meta.daily.started || meta.daily.plays > 0); // one try per day
 function kingAdapt(s, won) { // the King learns you: each win makes it harder (more if you had time to spare), a loss eases it a little, never below the base
-  const k = s.king, cur = meta.kingMult || 1;
+  const k = s.king, cur = meta.kingMult || 1; // after every run, the extra try included, so the next one finds it balanced
   if (won) { const left = Math.max(0, k.limit - s.runT) / k.limit; meta.kingWins = (meta.kingWins || 0) + 1; meta.kingMult = Math.min(tune.king_mult_cap, cur * (1 + Math.max(tune.king_win_min, left * tune.king_win_per_left))); }
   else meta.kingMult = Math.max(1, cur * (1 - tune.king_ease));
   saveMeta();
 }
 function kingGiveUp(s) { // leaving mid-fight spends the try and pays the quarters taken at once, without the chest scene
-  const k = s.king; k.over = true; k.frac = kingFrac(s); k.band = kingBand(k.frac, false); k.before = meta.daily.date === todayStr() ? meta.daily.band || 0 : 0; if (k.band > k.before) applyChest(kingChest(k.band)); kingAdapt(s, false);
+  const k = s.king; k.over = true; k.frac = kingFrac(s); k.band = kingBand(k.frac, false); k.before = meta.daily.date === todayStr() ? meta.daily.band || 0 : 0; if (k.band >= 1) applyChest(kingChest(k.band)); kingAdapt(s, false);
 }
 function kingEnd(won) { // the fight is over (broken, out of time, or the board filled): pay the band reached, but only if it beats today's best
   const s = state, k = s.king; if (!k || k.over) return; k.over = true; k.won = !!won; k.frac = kingFrac(s); k.band = kingBand(k.frac, won);
   const before = meta.daily.date === todayStr() ? meta.daily.band || 0 : 0; k.before = before;
-  if (k.band > before) { s.chestQueue.push(kingChest(k.band)); }
+  if (k.band >= 1) { s.chestQueue.push(kingChest(k.band)); } // every run pays the chest its result deserves
   s.bestBossTier = Math.max(s.bestBossTier, k.won ? 3 : 0); kingAdapt(s, won);
   if (!won) kingFinish();
 }
@@ -1499,8 +1517,8 @@ function nextRound() {
     const fs = pressure() >= tune.pressure_from ? tune.boss_fail_stones : tune.boss_fail_calm; s.stonesPending += fs;
     if (tune.boss_wound_keep > 0) { // it flees wounded and will be back: the damage you did is not thrown away
       const f = Math.max(0, Math.min(1, bossDmgNow(s) / s.boss.hp)), r = Math.max(0.05, (1 - (s.boss.wound || 0)) * (1 - tune.boss_wound_keep * f));
-      s.wounded = { type: s.boss.type, tier: s.boss.tier, r }; banner('THE WARDEN FLEES', 'it will be back ' + Math.round(100 * (1 - r)) + '% weaker', '#ff6b7a');
-    } else banner('THE WARDEN ENDURES', fs + (fs === 1 ? ' stone falls as it retaliates' : ' stones fall as it retaliates'), '#ff6b7a');
+      s.wounded = { type: s.boss.type, tier: s.boss.tier, r }; banner('THE WARDEN FLEES', '', '#ff6b7a');
+    } else banner('THE WARDEN ENDURES', '', '#ff6b7a');
   }
   if (!s.boss) s.roundHist.push({ pts: s.roundDmg, drops: Math.max(1, s.roundDrops) });
   s.round++; s.roundDrops = 0; s.roundStartScore = s.score; s.roundDmg = 0; s.bossDmg = 0; s.dropDmg = 0; s.roundBoost = false; s.relics.timewarp = false;
@@ -1529,7 +1547,7 @@ function rollChest(n, bossTier = 0) {
   return { tier, n, coins: Math.round(tune.chest_coins * n * (1 + 0.5 * tier)), dust, gems: tier >= 3 ? 2 : tier >= 2 ? 1 : 0, shards: bossTier >= 3 ? 2 : bossTier === 2 ? 1 : bossTier === 1 && rng() < tune.shard_rare ? 1 : 0, trinket: rng() < tune.chest_trinket_chance ? rollTrinket() : null };
 }
 function chestRows(ch) { const r = []; if (ch.coins) r.push({ k: 'coins', n: ch.coins }); ch.dust.forEach((d, i) => { if (d) r.push({ k: 'dust', n: d, i }); }); if (ch.gems) r.push({ k: 'gems', n: ch.gems }); if (ch.shards) r.push({ k: 'shards', n: ch.shards }); if (ch.trinket) r.push({ k: 'trinket', id: ch.trinket }); return r; }
-function applyChest(ch) { const s = state; s.runCoins += ch.coins; ch.dust.forEach((d, i) => { s.dustGain[i] += d; }); s.chestGems += ch.gems; s.shardGain += ch.shards || 0; if (ch.trinket) s.loot.push(ch.trinket); }
+function applyChest(ch) { const s = state; s.runCoins += ch.coins; if (ch.king) s.kingCoins = (s.kingCoins || 0) + ch.coins; ch.dust.forEach((d, i) => { s.dustGain[i] += d; }); s.chestGems += ch.gems; s.shardGain += ch.shards || 0; if (ch.trinket) s.loot.push(ch.trinket); }
 function openChest() { queueTip('chest'); const s = state, ch = s.chestQueue.shift(); s.chest = ch; ch.t = 0; ch.ot = 0; ch.open = false; s.phase = 'chest'; Music.sfx('open'); }
 function updateChest(dt) {
   const s = state, ch = s.chest; ch.t += dt; if (ch.open) ch.ot += dt;
@@ -1803,7 +1821,8 @@ function shopButtonPos(key) { // a test hook: scroll a button into view and retu
 // ---- A fake rewarded ad: a stand-in for a real ad network ------------------------------------------------
 let adJob = null;
 function startAd(kind, onDone, ret) { if (adFree()) { onDone(); return; } /* Remove Ads: the reward comes without the ad */ adJob = { t: 0, dur: tune.ad_seconds, onDone, ret, kind }; scene = 'ad'; }
-function claimDouble() { const st = state; meta.coins += st.payout; st.adBonus = st.payout; st.adClaimed = true; if (tune.ad_double_gems) { meta.gems += st.gems; st.adGems = st.gems; } saveMeta(); fanfare(2); }
+const doubleBase = s => Math.max(0, s.payout - (s.kingCoins || 0)); // what the x2 ad doubles: the run's pay, never the King's chest (its gold is fixed by the band)
+function claimDouble() { const st = state, base = doubleBase(st); meta.coins += base; st.adBonus = base; st.adClaimed = true; if (tune.ad_double_gems) { meta.gems += st.gems; st.adGems = st.gems; } saveMeta(); fanfare(2); }
 // ---- Update ---------------------------------------------------------------------------------
 const qn = () => Math.max(2, Math.min(3, tune.queue_size)), trayW = () => COLS * CELL - (meta.showBtns ? 112 : 0), slotW = () => (trayW() - 16 * (qn() - 1)) / qn(), slotX = i => BX + i * (slotW() + 16);
 const slotRect = i => ({ x: slotX(i), y: TRAY_Y, w: slotW(), h: TRAY_H });
@@ -2114,8 +2133,8 @@ function updatePlay(dt) {
   if (s.king && !s.king.over) kingTimeWarn(s);
   if (s.king && !s.king.over && s.phase === 'input' && s.runT >= s.king.limit) { s.gained = 'Time!'; banner('TIME IS UP', '', '#ff6b7a'); s.king.timeUp = true; kingEnd(false); return; } // out of time: the quarters you took are your reward
   { const P = s.king ? 0 : pressure(); // a warning before the tide gets hard, never a surprise
-    if (!s.warnNear && P >= tune.pressure_from && P < 1) { s.warnNear = true; banner('THE TIDE QUICKENS', timeP() > scoreP() ? 'the run is getting long' : best >= tune.pressure_floor ? 'you are nearing your best score' : 'your score is climbing', '#ff9d4d'); }
-    if (!s.warnOver && P >= 1) { s.warnOver = true; s.warnNear = true; banner('THE TIDE RUNS HOT', bar() > 0 && s.score > bar() ? 'beyond your best score' : 'from here it is harder', '#ff6b7a'); } } // the run clock waits while you choose a Relic or face the Joker
+    if (!s.warnNear && P >= tune.pressure_from && P < 1) { s.warnNear = true; banner('THE TIDE QUICKENS', '', '#ff9d4d'); }
+    if (!s.warnOver && P >= 1) { s.warnOver = true; s.warnNear = true; banner('THE TIDE RUNS HOT', '', '#ff6b7a'); } } // the run clock waits while you choose a Relic or face the Joker
   if (s.runT >= s.nextTide) { // the tide: a stone falls after your next move, on a shrinking clock
     s.tides++; s.nextTide = s.runT + tideGap(); if (s.tideWaiting <= 0) { const n = tideStones() + (tr('blood_pact') ? 1 : 0); s.stonesPending += n; s.tideWaiting = n; } // the tide does not pile up: while one batch is still waiting for your next move, the next tide adds none
     floatText(W / 2, BY + 36, 'THE TIDE RISES', '#ff6b7a', 34); queueTip('tide'); tone(95, 0.35, 'sawtooth', 0.22);
@@ -2412,9 +2431,9 @@ function drawBossIntro() { // the Warden's entrance: letterbox bars, a red flash
   const flash = Math.max(0, 0.7 - t * 2); if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, -VOFF, W, H); }
   warden(W / 2, 660 + (1 - ease) * 120, (70 + 70 * ease) * (1 + 0.03 * Math.sin(t * 8)), ease, s.boss.type, s.boss.tier);
   const bt = bossType(s.boss.type), tc = s.boss.tier ? DUST_COL[s.boss.tier] : '#ff6b7a';
-  ctx.globalAlpha = ease; if (s.boss.wound) text('IT RETURNS, ' + Math.round(100 * s.boss.wound) + '% WEAKER', W / 2, 250, 26, '#ffb86b', 'center', '800', 640); text(s.boss.king ? 'DAILY CHALLENGE' : 'BOSS ' + s.boss.n, W / 2, 290, 30, '#ff6b7a', 'center', '800'); if (s.boss.tier) text(RARITY_NAMES[s.boss.tier].toUpperCase(), W / 2, 332, 34, tc, 'center', '900', 500); text(bossName(s.boss), W / 2, s.boss.tier ? 396 : 360, 60, '#ffffff', 'center', '900', 660);
-  if (s.boss.king) { text('Break it in ' + fmtTime(s.king.limit), W / 2, 850, 28, '#ffe08a', 'center', '700'); wrap('Every quarter of its health you take pays a chest. Break it for the jackpot.', W / 2, 894, 620, 30, 23, '#ffc8d0'); wrap(bt.desc(bossEvery(s.boss)), W / 2, 980, 620, 30, 22, '#ff9d8d'); ctx.globalAlpha = 1; return; }
-  text('Score ' + fmtN(s.boss.hp) + ' this round to break it', W / 2, 850, 28, '#ffc8d0', 'center', '700'); wrap(bt.desc(bossEvery(s.boss)), W / 2, 894, 620, 30, 23, '#ff9d8d'); ctx.globalAlpha = 1;
+  ctx.globalAlpha = ease; if (s.boss.wound) text('IT RETURNS', W / 2, 290, 30, '#ffb86b', 'center', '800', 640); if (s.boss.tier) text(RARITY_NAMES[s.boss.tier].toUpperCase(), W / 2, 332, 34, tc, 'center', '900', 500); text(bossName(s.boss), W / 2, s.boss.tier ? 396 : 360, 60, '#ffffff', 'center', '900', 660);
+  if (s.boss.king) { text('Break it in ' + fmtTime(s.king.limit), W / 2, 850, 28, '#ffe08a', 'center', '700'); ctx.globalAlpha = 1; return; }
+  text('Score ' + fmtN(s.boss.hp) + ' this round to break it', W / 2, 850, 28, '#ffc8d0', 'center', '700'); ctx.globalAlpha = 1;
   if (t > 0.9) text('Space or tap to begin', W / 2, 1000, 28, '#ffffff', 'center', '700');
 }
 function boardZoomed() { // during the killing blow the board zooms in on the set that lands it, inside its own frame; the set is eased towards the middle, never past what the board covers
@@ -2513,7 +2532,7 @@ function drawResultCard() {
   else if (c.kind === 'daily' && c.king) { const kg = c.king; text('DAILY CHALLENGE', cx, Y + 50, 26, col, 'center', '800', 480); text(kg.won ? 'THE KING FALLS' : 'THE KING SURVIVES', cx, Y + 120, 38, kg.won ? '#ffe08a' : '#ffffff', 'center', '800', 560);
     text(Math.round(100 * kg.frac) + '% of its health taken', cx, Y + 176, 28, '#c8d0ff', 'center', '700', 560);
     for (let q = 0; q < 4; q++) { rr(cx - 150 + q * 78, Y + 214, 66, 24, 8); ctx.fillStyle = q < kg.band ? DUST_COL[Math.min(3, q)] : '#1b1530'; ctx.fill(); }
-    text(kg.band > kg.before ? 'New reward: ' + DUST_NAME[Math.min(3, kg.band - 1)] + ' chest' : kg.band ? 'Reward already taken today' : 'Take a quarter of it for a reward', cx, Y + 282, 26, kg.band > kg.before ? '#ffd23f' : '#9db4ff', 'center', '800', 560);
+    if (kg.band >= 1) text('New reward: ' + DUST_NAME[Math.min(3, kg.band - 1)] + ' chest', cx, Y + 282, 26, '#ffd23f', 'center', '800', 560);
     if (c.streak) text('Streak ' + c.streak, cx, Y + 340, 26, '#ffc93c', 'center', '700', 500); if (c.bonus) text('Bonus +' + c.bonus + ' coins', cx, Y + 380, 26, '#ffd23f', 'center', '800', 500); }
   else if (c.kind === 'daily') { text('DAILY RUN', cx, Y + 50, 26, col, 'center', '800', 480); text(c.name, cx, Y + 130, 38, '#ffffff', 'center', '800', 500); text('Today\'s best ' + c.best, cx, Y + 210, 28, '#c8d0ff', 'center', '700', 500);
     if (c.streak) text('Streak ' + c.streak, cx, Y + 270, 28, '#ffc93c', 'center', '700', 500); if (c.bonus) text('Bonus +' + c.bonus + ' coins', cx, Y + 340, 28, '#ffd23f', 'center', '800', 500); }
@@ -2707,7 +2726,7 @@ function updateTitle() {
   if (hit('shop') || pressed('KeyS')) return openShop('title');
   if (workshopOpen() && (hit('workshop') || pressed('KeyW'))) { scene = 'workshop'; Music.sfx('open'); return; }
   if (hit('missions')) { scene = 'missions'; wsScroll = 0; Music.sfx('open'); return; }
-  if (workshopOpen() && (hit('daily') || pressed('KeyD'))) { if (dailyDone()) { Music.sfx('back'); return; } return startRun(true); }
+  if (workshopOpen() && (hit('daily') || pressed('KeyD'))) { if (dailyDone()) { if (retryAvailable()) openRetryOffer('title'); else Music.sfx('back'); return; } return startRun(true); }
   if (hit('howto')) { openHelp('title'); return; }
   if (hit('play') || pressed('Enter') || pressed('Space')) playNow();
 }
@@ -2716,12 +2735,11 @@ function drawTitle() {
   ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(696 - cw - 24, 44, 11, 0, 7); ctx.fill(); ctx.strokeStyle = '#a07a10'; ctx.lineWidth = 3; ctx.stroke(); SKIPT = true; text(fmtN(meta.coins), 696, 44, 26, '#ffd23f', 'right', '800'); SKIPT = false;
   for (let k = 0; k < 5; k++) tile(60 + k * 124, 150 + 14 * Math.sin(clock.now() * 2 + k), 108, k);
   text('RUNE', W / 2, 360, 110, '#ffffff', 'center', '900'); text('BREAKER', W / 2, 460, 110, '#9db4ff', 'center', '900');
-  text('chain the runes, chase the score', W / 2, 540, 28, '#8b95c9', 'center', '600');
   { const lab = 'Best: ' + fmtN(best); ctx.font = `800 30px ${FONT}`; const w = ctx.measureText(T(lab)).width; titleIcon('trophy', W / 2 - w / 2 - 22, 600); SKIPT = false; text(lab, W / 2 + 16, 600, 30, '#c9a8ff', 'center', '800', 420); } // the record: its own colour, not the coins' gold
   { const r = titleRect('play'); rr(r.x, r.y, r.w, r.h, 20); const g = ctx.createLinearGradient(0, r.y, 0, r.y + r.h); g.addColorStop(0, '#2fa86a'); g.addColorStop(1, '#1d7a4c'); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#9dffc8'; ctx.stroke(); text('PLAY', r.x + r.w / 2, r.y + r.h / 2 + 2, 46, '#ffffff', 'center', '900', r.w - 40); }
   const dm = dailyMod(), played = meta.daily.date === todayStr();
   { const r = titleRect('daily'); if (r && dailyDone()) { rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#12163a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#2d3566'; ctx.stroke(); ctx.globalAlpha = 0.45; titleIcon('daily', r.x + 52, r.y + r.h / 2); ctx.globalAlpha = 1;
-      text('DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#5d678f', 'center', '800', r.w - 130); text(meta.daily.band >= 4 ? 'King broken  back tomorrow' : 'Done today  ' + Math.round(100 * (meta.daily.frac || 0)) + '%  back tomorrow', r.x + r.w / 2 + 20, r.y + 68, 19, '#5d678f', 'center', '600', r.w - 130); }
+      text('DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#5d678f', 'center', '800', r.w - 130); if (retryAvailable()) { ctx.strokeStyle = '#6a4a9a'; rr(r.x, r.y, r.w, r.h, 16); ctx.stroke(); text('Extra try today', r.x + r.w / 2 + 20, r.y + 68, 19, '#c9a8ff', 'center', '700', r.w - 130); } else text(meta.daily.band >= 4 ? 'King broken  back tomorrow' : 'Done today  ' + Math.round(100 * (meta.daily.frac || 0)) + '%  back tomorrow', r.x + r.w / 2 + 20, r.y + 68, 19, '#5d678f', 'center', '600', r.w - 130); }
     else if (r) { rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#241c08'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#8a6a1a'; ctx.stroke(); titleIcon('daily', r.x + 52, r.y + r.h / 2); text(KBD ? 'DAILY CHALLENGE  (D)' : 'DAILY CHALLENGE', r.x + r.w / 2 + 20, r.y + 34, 24, '#ffffff', 'center', '800', r.w - 130); text(dm.name + (played ? '  ' + Math.round(100 * (meta.daily.frac || 0)) + '%' + (meta.daily.band >= 4 ? ' DONE' : '') : '') + (meta.streak > 0 && meta.lastDate === todayStr() ? '  streak ' + meta.streak : ''), r.x + r.w / 2 + 20, r.y + 68, 19, '#e0b030', 'center', '600', r.w - 130); } }
   [['workshop', 'WORKSHOP', 'W'], ['missions', 'MISSIONS', ''], ['shop', 'SHOP', 'S']].forEach(([id, label, key]) => { const r = titleRect(id); if (!r) return; rr(r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#12163a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#3a4580'; ctx.stroke(); titleIcon(id, r.x + r.w / 2, r.y + 30); text(KBD && key ? label + ' (' + key + ')' : label, r.x + r.w / 2, r.y + 64, 18, '#c8d0ff', 'center', '800', r.w - 12);
     if (id === 'missions') { const n = claimables(); if (n > 0) menuBadge(r.x + r.w - 10, r.y + 10, String(n)); } if (id === 'shop' && giftReady()) menuBadge(r.x + r.w - 10, r.y + 10, '!'); });
@@ -2878,7 +2896,8 @@ const scenes = {
         if (pressed('Space') || pressed('Enter') || (click && (inRect(click, 160, 1030, 400, 70) || inRect(click, 60, 440, 600, 480)))) go();
         return;
       }
-      if (!state.adClaimed && !state.reviveAdDeclined && (pressed('KeyA') || (click && inRect(click, 110, 948, 500, 60)))) return startAd('double', claimDouble, 'over'); // one ask per run end
+      const AR = adRects();
+      if (AR.dbl && (pressed('KeyA') || (click && inRect(click, AR.dbl.x, AR.dbl.y, AR.dbl.w, AR.dbl.h)))) return startAd('double', claimDouble, 'over');
       const kg = !!state.king; // after the Daily Challenge there is no "run again": it is one try a day
       if (click && inRect(click, kg || !workshopOpen() ? 420 : 470, 1030, 190, 70)) { scene = 'title'; Music.sfx('back'); return; }
       if (workshopOpen() && (pressed('KeyW') || (click && inRect(click, kg ? 110 : 265, 1030, 190, 70)))) scene = 'workshop';
@@ -2896,7 +2915,7 @@ const scenes = {
       if (state.showStats) drawResultStats(st); else { drawResultCard(); if (state.cards.length > 1) for (let i = 0; i < state.cards.length; i++) { ctx.fillStyle = i === state.cardI ? '#ffffff' : '#3a4580'; ctx.beginPath(); ctx.arc(W / 2 + (i - (state.cards.length - 1) / 2) * 26, 930, i === state.cardI ? 8 : 6, 0, 7); ctx.fill(); } }
       if (!last) { if (!state.showStats) btn(590, 912, 110, 40, 'SKIP', true, '#6f7bc4', 16); btn(160, 1030, 400, 70, 'NEXT', true, '#7dffb0', 30); }
       else {
-        if (!state.adClaimed && !state.reviveAdDeclined) btn(110, 948, 500, 60, (adFree() ? 'DOUBLE COINS  (+' : 'WATCH AD: DOUBLE COINS  (+') + (st.coins || 0) + ')', true, '#ffd23f', 24);
+        { const AR = adRects(); if (AR.dbl) btn(AR.dbl.x, AR.dbl.y, AR.dbl.w, AR.dbl.h, (adFree() ? 'DOUBLE COINS  (+' : 'WATCH AD: DOUBLE COINS  (+') + doubleBase(state) + ')', true, '#ffd23f', 24); }
         if (state.king) { btn(110, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(420, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
         else if (workshopOpen()) { btn(60, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(265, 1030, 190, 70, 'WORKSHOP', true, '#5b78ff', 22); btn(470, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
         else { btn(110, 1030, 190, 70, 'RUN AGAIN', true, '#7dffb0', 22); btn(420, 1030, 190, 70, 'MAIN MENU', true, '#9db4ff', 22); }
@@ -2946,6 +2965,18 @@ scenes.pay = { // a stand-in for the platform's own purchase sheet
     btn(110, 660, 500, 70, 'CONFIRM PURCHASE', true, '#7dffb0', 28); btn(110, 744, 500, 60, 'CANCEL', true, '#ff6b7a', 24);
   },
 };
+scenes.retry = { // the extra try's offer: honest, calm, and "not now" is the big button
+  update() {
+    if (pressed('Escape') || (click && inRect(click, 110, 1040, 500, 80))) { scene = retryFrom; Music.sfx('back'); return; }
+    if (click) retryRoutes().forEach((rt, i) => { if (inRect(click, 110, 700 + i * 80, 500, 62)) startRetry(rt); });
+    if (!retryAvailable() && scene === 'retry') scene = retryFrom; // (nothing left to offer)
+  },
+  draw() {
+    bg(); text('EXTRA TRY', W / 2, 190, 60, '#ffe08a', 'center', '900', 620);
+    retryRoutes().forEach((rt, i) => btn(110, 700 + i * 80, 500, 62, rt === 'token' ? 'USE EXTRA TRY TOKEN' : rt === 'free' ? 'EXTRA TRY  (Remove Ads)' : 'WATCH AN AD: EXTRA TRY', true, rt === 'ad' ? '#c46bff' : '#7dffb0', 24));
+    btn(110, 1040, 500, 80, 'NOT NOW', true, '#9db4ff', 30);
+  },
+};
 scenes.ad = { // the fake ad: a countdown, then a claim button
   update() {
     const j = adJob; j.t += STEP; const done = j.t >= j.dur;
@@ -2964,7 +2995,7 @@ scenes.ad = { // the fake ad: a countdown, then a claim button
     text('YOUR AD HERE', W / 2, 520, 60, '#ffffff', 'center', '900'); text('A placeholder: no ad network is connected', W / 2, 580, 24, '#ffffffbb', 'center', '600');
     rr(120, 860, 480, 18, 9); ctx.fillStyle = '#141a40'; ctx.fill(); rr(120, 860, Math.max(14, 480 * k), 18, 9); ctx.fillStyle = '#ffd23f'; ctx.fill();
     text(done ? 'Thanks for watching!' : 'Reward in ' + Math.ceil(j.dur - j.t) + ' s', W / 2, 920, 30, '#ffffff', 'center', '800');
-    if (done) btn(160, 1000, 400, 76, j.kind === 'revive' ? 'CLAIM REVIVE' : j.kind === 'gems' ? 'CLAIM GEMS' : 'CLAIM DOUBLE COINS', true, '#7dffb0', 28);
+    if (done) btn(160, 1000, 400, 76, j.kind === 'revive' ? 'CLAIM REVIVE' : j.kind === 'gems' ? 'CLAIM GEMS' : j.kind === 'retry' ? 'START EXTRA TRY' : 'CLAIM DOUBLE COINS', true, '#7dffb0', 28);
   },
 };
 
